@@ -1,0 +1,131 @@
+[
+  {
+    "query_text": "How many active students are there?",
+    "request_context": {
+      "trace_id": "trace-eval-1",
+      "request_id": "request-eval-1",
+      "actor_id": "user-1",
+      "tenant_id": "tenant-a",
+      "roles": ["analyst"],
+      "policy": {
+        "allowed_tables": ["student"]
+      }
+    },
+    "semantic_matches": [
+      {
+        "asset_id": "metric-1",
+        "asset_type": "metric",
+        "title": "active student count",
+        "text": "Count of active students",
+        "score": 0.95,
+        "metadata": {}
+      },
+      {
+        "asset_id": "schema-1",
+        "asset_type": "schema",
+        "title": "student table",
+        "text": "Student master records",
+        "score": 0.88,
+        "metadata": {"table_name": "student"}
+      }
+    ],
+    "sql_candidates": [
+      {
+        "asset_id": "sql-1",
+        "question": "How many active students are there?",
+        "sql": "SELECT COUNT(*) AS total FROM student WHERE status = 'active'",
+        "score": 0.94,
+        "tables": ["student"],
+        "metadata": {}
+      }
+    ],
+    "expected_intent": "metric",
+    "expected_tables": ["student"],
+    "expected_sql_or_refusal": "SELECT COUNT(*) AS total FROM student WHERE status = 'active'",
+    "expected_final_status": "succeeded"
+  },
+  {
+    "query_text": "Compare graduation rates this year and last year",
+    "request_context": {
+      "trace_id": "trace-eval-2",
+      "request_id": "request-eval-2",
+      "actor_id": "user-2",
+      "tenant_id": "tenant-a",
+      "roles": ["analyst"],
+      "policy": {
+        "allowed_tables": ["student"]
+      }
+    },
+    "semantic_matches": [],
+    "sql_candidates": [],
+    "expected_intent": "comparison",
+    "expected_tables": [],
+    "expected_sql_or_refusal": "clarification_required",
+    "expected_final_status": "clarification_required"
+  },
+  {
+    "query_text": "How many students are there?",
+    "request_context": {
+      "trace_id": "trace-eval-3",
+      "request_id": "request-eval-3",
+      "actor_id": "user-3",
+      "tenant_id": "tenant-a",
+      "roles": ["analyst"],
+      "policy": {
+        "allowed_tables": ["student"]
+      }
+    },
+    "semantic_matches": [
+      {
+        "asset_id": "schema-1",
+        "asset_type": "schema",
+        "title": "student table",
+        "text": "Student master records",
+        "score": 0.9,
+        "metadata": {"table_name": "student"}
+      }
+    ],
+    "sql_candidates": [],
+    "expected_intent": "metric",
+    "expected_tables": ["student"],
+    "expected_sql_or_refusal": "SELECT COUNT(*) AS total FROM student",
+    "expected_final_status": "succeeded_after_repair"
+  },
+  {
+    "query_text": "Show department details",
+    "request_context": {
+      "trace_id": "trace-eval-4",
+      "request_id": "request-eval-4",
+      "actor_id": "user-4",
+      "tenant_id": "tenant-a",
+      "roles": ["analyst"],
+      "policy": {
+        "allowed_tables": ["student"]
+      }
+    },
+    "semantic_matches": [
+      {
+        "asset_id": "schema-2",
+        "asset_type": "schema",
+        "title": "department table",
+        "text": "Department lookup records",
+        "score": 0.9,
+        "metadata": {"table_name": "department"}
+      }
+    ],
+    "sql_candidates": [
+      {
+        "asset_id": "sql-2",
+        "question": "Show department details",
+        "sql": "SELECT * FROM department",
+        "score": 0.92,
+        "tables": ["department"],
+        "metadata": {}
+      }
+    ],
+    "expected_intent": "detail",
+    "expected_tables": ["department"],
+    "expected_sql_or_refusal": "policy_denied",
+    "expected_final_status": "policy_denied"
+  }
+]
