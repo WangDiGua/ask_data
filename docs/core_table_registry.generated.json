@@ -1,0 +1,908 @@
+{
+  "database": "wenshu_db",
+  "tables": {
+    "dcstu": {
+      "columns": [
+        {
+          "name": "XM",
+          "comment": "姓名"
+        },
+        {
+          "name": "PYCCMC",
+          "comment": "培养层次名称"
+        },
+        {
+          "name": "SFZX",
+          "comment": "是否在校"
+        },
+        {
+          "name": "XGH",
+          "comment": "学工号"
+        },
+        {
+          "name": "XSLBMC",
+          "comment": "学生类别名称"
+        },
+        {
+          "name": "ZZMMMC",
+          "comment": "政治面貌名称"
+        },
+        {
+          "name": "YXMC",
+          "comment": "院系名称"
+        },
+        {
+          "name": "ZYMC",
+          "comment": "专业名称"
+        },
+        {
+          "name": "XB",
+          "comment": "性别"
+        },
+        {
+          "name": "XBDM",
+          "comment": "性别代码"
+        },
+        {
+          "name": "XBMC",
+          "comment": "性别名称"
+        },
+        {
+          "name": "DATA1",
+          "comment": "扩展字段1"
+        },
+        {
+          "name": "DATA2",
+          "comment": "扩展字段2"
+        },
+        {
+          "name": "DATA3",
+          "comment": "扩展字段3"
+        },
+        {
+          "name": "isenable",
+          "comment": "是否启用"
+        },
+        {
+          "name": "uuid",
+          "comment": "全局唯一标识"
+        },
+        {
+          "name": "orders",
+          "comment": "排序号"
+        },
+        {
+          "name": "author",
+          "comment": "创建人"
+        },
+        {
+          "name": "authorname",
+          "comment": "创建人姓名"
+        },
+        {
+          "name": "created",
+          "comment": "创建时间"
+        },
+        {
+          "name": "editor",
+          "comment": "最后编辑人"
+        },
+        {
+          "name": "editorname",
+          "comment": "最后编辑人姓名"
+        },
+        {
+          "name": "lastupdated",
+          "comment": "最后更新时间"
+        },
+        {
+          "name": "ddid",
+          "comment": "数据来源标识"
+        }
+      ],
+      "sample_values": {
+        "YXMC": [
+          "烟台研究院",
+          "信息与电气工程学院",
+          "工学院",
+          "人文与发展学院",
+          "经济管理学院",
+          "食品科学与营养工程学院",
+          "农学院",
+          "资源与环境学院",
+          "动物医学院",
+          "动物科学技术学院"
+        ],
+        "PYCCMC": [
+          "本科",
+          "硕士研究生",
+          "博士研究生",
+          "第二学士学位",
+          "进修生",
+          "国际学院计划外"
+        ],
+        "ZZMMMC": [
+          "共青团员",
+          "中国共产党党员",
+          "中国共产主义青年团团员",
+          "群众",
+          "中国共产党预备党员",
+          "其他",
+          "中共党员",
+          "外国",
+          "中共预备党员",
+          "九三学社社员"
+        ],
+        "XSLBMC": [
+          "学籍生",
+          "全日制专业学位硕士",
+          "硕士",
+          "博士",
+          "硕转博",
+          "非全日制专业学位硕士",
+          "进修生",
+          "非学籍生",
+          "全日制专业学位博士",
+          "硕博连读（硕）学术型"
+        ],
+        "XBMC": [
+          "女",
+          "男"
+        ],
+        "SFZX": [
+          "是",
+          "休学",
+          "其他"
+        ]
+      }
+    },
+    "dcemp": {
+      "columns": [
+        {
+          "name": "XB",
+          "comment": "性别"
+        },
+        {
+          "name": "XM",
+          "comment": "姓名"
+        },
+        {
+          "name": "SZDWDM",
+          "comment": "所在单位代码"
+        },
+        {
+          "name": "SZDWMC",
+          "comment": "所在单位名称"
+        },
+        {
+          "name": "XGH",
+          "comment": "教工号"
+        },
+        {
+          "name": "RYZTDM",
+          "comment": "人员状态代码"
+        },
+        {
+          "name": "RYZTMC",
+          "comment": "人员状态名称"
+        },
+        {
+          "name": "DATA1",
+          "comment": "扩展字段1"
+        },
+        {
+          "name": "DATA2",
+          "comment": "扩展字段2"
+        },
+        {
+          "name": "data3",
+          "comment": "扩展字段3"
+        },
+        {
+          "name": "isenable",
+          "comment": "是否启用"
+        },
+        {
+          "name": "uuid",
+          "comment": "全局唯一标识"
+        },
+        {
+          "name": "orders",
+          "comment": "排序号"
+        },
+        {
+          "name": "author",
+          "comment": "创建人"
+        },
+        {
+          "name": "authorname",
+          "comment": "创建人姓名"
+        },
+        {
+          "name": "created",
+          "comment": "创建时间"
+        },
+        {
+          "name": "editor",
+          "comment": "最后编辑人"
+        },
+        {
+          "name": "editorname",
+          "comment": "最后编辑人姓名"
+        },
+        {
+          "name": "lastupdated",
+          "comment": "最后更新时间"
+        },
+        {
+          "name": "ddid",
+          "comment": "数据来源标识"
+        }
+      ],
+      "sample_values": {
+        "SZDWMC": [
+          "后勤实体",
+          "烟台研究院",
+          "动物医学院",
+          "动物科学技术学院",
+          "生物学院",
+          "农学院",
+          "资源与环境学院",
+          "人文与发展学院",
+          "理学院",
+          "食品科学与营养工程学院"
+        ],
+        "RYZTMC": [
+          "在岗"
+        ],
+        "XB": [
+          "女",
+          "男"
+        ]
+      }
+    },
+    "dcorg": {
+      "columns": [
+        {
+          "name": "wid",
+          "comment": "唯一标识"
+        },
+        {
+          "name": "dwmc",
+          "comment": "单位名称"
+        },
+        {
+          "name": "xndwdm",
+          "comment": "校内单位代码"
+        },
+        {
+          "name": "sfsy",
+          "comment": "是否使用"
+        },
+        {
+          "name": "data1",
+          "comment": "扩展字段1"
+        },
+        {
+          "name": "data2",
+          "comment": "扩展字段2"
+        },
+        {
+          "name": "data3",
+          "comment": "扩展字段3"
+        },
+        {
+          "name": "isenable",
+          "comment": "是否启用"
+        },
+        {
+          "name": "uuid",
+          "comment": "全局唯一标识"
+        },
+        {
+          "name": "orders",
+          "comment": "排序号"
+        },
+        {
+          "name": "author",
+          "comment": "创建人"
+        },
+        {
+          "name": "authorname",
+          "comment": "创建人姓名"
+        },
+        {
+          "name": "created",
+          "comment": "创建时间"
+        },
+        {
+          "name": "editor",
+          "comment": "最后编辑人"
+        },
+        {
+          "name": "editorname",
+          "comment": "最后编辑人姓名"
+        },
+        {
+          "name": "lastupdated",
+          "comment": "最后更新时间"
+        },
+        {
+          "name": "ddid",
+          "comment": "数据来源标识"
+        }
+      ],
+      "sample_values": {
+        "DWMC": [
+          "审计处",
+          "科学技术发展研究院",
+          "发展规划处",
+          "人事处",
+          "财务处（会计核算中心）",
+          "国际合作与交流处（港澳台办公室）",
+          "离退休工作处",
+          "信息与电气工程学院",
+          "社会服务处（新农村发展研究院）",
+          "教育基金会秘书处"
+        ],
+        "SFSY": [
+          "是"
+        ]
+      }
+    },
+    "t_bsdt_jzgygcg": {
+      "columns": [
+        {
+          "name": "WID",
+          "comment": "唯一标识"
+        },
+        {
+          "name": "ID",
+          "comment": "业务主键"
+        },
+        {
+          "name": "ZGH",
+          "comment": "职工号"
+        },
+        {
+          "name": "XM",
+          "comment": "姓名"
+        },
+        {
+          "name": "DWDM",
+          "comment": "单位代码"
+        },
+        {
+          "name": "CJR",
+          "comment": "创建人"
+        },
+        {
+          "name": "NF",
+          "comment": "年度"
+        },
+        {
+          "name": "PCDW",
+          "comment": "派出单位"
+        },
+        {
+          "name": "XZZW",
+          "comment": "行政职务"
+        },
+        {
+          "name": "ZC",
+          "comment": "职称"
+        },
+        {
+          "name": "PJH",
+          "comment": "批件号"
+        },
+        {
+          "name": "CFRWLX",
+          "comment": "出访任务类型"
+        },
+        {
+          "name": "CFGJHDQ",
+          "comment": "出访国家或地区"
+        },
+        {
+          "name": "CFNF",
+          "comment": "出发日期"
+        },
+        {
+          "name": "CJSJ",
+          "comment": "出境时间"
+        },
+        {
+          "name": "RJSJ",
+          "comment": "入境时间"
+        },
+        {
+          "name": "YQRDWZWMC",
+          "comment": "邀请人单位中文名称"
+        },
+        {
+          "name": "YQRDWYWMC",
+          "comment": "邀请人单位英文名称"
+        },
+        {
+          "name": "CLRQ",
+          "comment": "处理日期"
+        },
+        {
+          "name": "CZLX",
+          "comment": "操作类型"
+        }
+      ],
+      "sample_values": {
+        "NF": [
+          "2025",
+          "2024",
+          "2023",
+          "2026",
+          "2022",
+          "2021"
+        ],
+        "PCDW": [
+          "人文与发展学院",
+          "经济管理学院",
+          "资源与环境学院",
+          "食品科学与营养工程学院",
+          "动物科学技术学院",
+          "工学院",
+          "水利与土木工程学院",
+          "草业科学与技术学院",
+          "植物保护学院",
+          "农学院"
+        ],
+        "ZC": [
+          "教授",
+          "副教授",
+          "无",
+          "讲师（高校）",
+          "副研究员（社会科学）",
+          "讲师",
+          "中级",
+          "副研究员（自然科学）",
+          "实验师",
+          "助理研究员"
+        ],
+        "XZZW": [
+          "无",
+          "副处",
+          "正处",
+          "正科",
+          "系主任",
+          "副系主任",
+          "食品营养与安全系副主任",
+          "副科",
+          "农业经济系主任",
+          "院长助理"
+        ],
+        "CFRWLX": [
+          "学术访问",
+          "学术会议",
+          "学术访问;学术会议",
+          "带领学生团组出访",
+          "其他",
+          "管理工作访问",
+          "国家公派（仅限于留基委项目）",
+          "学术访问;其他",
+          "学术访问;带领学生团组出访",
+          "学术会议;其他"
+        ],
+        "CFGJHDQ": [
+          "美国",
+          "日本",
+          "德国",
+          "英国",
+          "泰国",
+          "韩国",
+          "巴西",
+          "荷兰",
+          "坦桑尼亚",
+          "澳大利亚"
+        ]
+      }
+    },
+    "t_bsdt_xsygcg": {
+      "columns": [
+        {
+          "name": "WID",
+          "comment": "唯一标识"
+        },
+        {
+          "name": "ID",
+          "comment": "业务主键"
+        },
+        {
+          "name": "ZGH",
+          "comment": "学工号"
+        },
+        {
+          "name": "DWDM",
+          "comment": "单位代码"
+        },
+        {
+          "name": "NF",
+          "comment": "年度"
+        },
+        {
+          "name": "XM",
+          "comment": "姓名"
+        },
+        {
+          "name": "CJR",
+          "comment": "创建人"
+        },
+        {
+          "name": "PCDW",
+          "comment": "派出单位"
+        },
+        {
+          "name": "PJH",
+          "comment": "批件号"
+        },
+        {
+          "name": "CFRWLX",
+          "comment": "出访任务类型"
+        },
+        {
+          "name": "CFGJHDQ",
+          "comment": "出访国家或地区"
+        },
+        {
+          "name": "CFNF",
+          "comment": "出发日期"
+        },
+        {
+          "name": "CJSJ",
+          "comment": "出境时间"
+        },
+        {
+          "name": "RJSJ",
+          "comment": "入境时间"
+        },
+        {
+          "name": "YQRDWZWMC",
+          "comment": "邀请人单位中文名称"
+        },
+        {
+          "name": "YQRDWYWMC",
+          "comment": "邀请人单位英文名称"
+        },
+        {
+          "name": "CLRQ",
+          "comment": "处理日期"
+        },
+        {
+          "name": "CZLX",
+          "comment": "操作类型"
+        }
+      ],
+      "sample_values": {
+        "NF": [
+          "2025",
+          "2024",
+          "2023",
+          "2022",
+          "2026",
+          "2021"
+        ],
+        "PCDW": [
+          "资源与环境学院",
+          "人文与发展学院",
+          "农学院",
+          "食品科学与营养工程学院",
+          "工学院",
+          "动物科学技术学院",
+          "生物学院",
+          "经济管理学院",
+          "信息与电气工程学院",
+          "烟台研究院"
+        ],
+        "CFRWLX": [
+          "博士研究生",
+          "本科生",
+          "硕士研究生"
+        ],
+        "CFGJHDQ": [
+          "美国",
+          "德国",
+          "英国",
+          "中国-香港",
+          "日本",
+          "巴西",
+          "瑞士",
+          "荷兰",
+          "坦桑尼亚",
+          "比利时;荷兰"
+        ]
+      }
+    },
+    "t_gjc_lfzj": {
+      "columns": [
+        {
+          "name": "ID",
+          "comment": "业务主键"
+        },
+        {
+          "name": "ZJXM",
+          "comment": "专家姓名"
+        },
+        {
+          "name": "GJHDQ",
+          "comment": "国家或地区"
+        },
+        {
+          "name": "XB",
+          "comment": "性别"
+        },
+        {
+          "name": "CSNY",
+          "comment": "出生年月"
+        },
+        {
+          "name": "ZJHM",
+          "comment": "证件号码"
+        },
+        {
+          "name": "ZJYXQ",
+          "comment": "证件有效期"
+        },
+        {
+          "name": "ZGXL",
+          "comment": "最高学历"
+        },
+        {
+          "name": "SSXK",
+          "comment": "所属学科"
+        },
+        {
+          "name": "ZW",
+          "comment": "职务"
+        },
+        {
+          "name": "ZC",
+          "comment": "职称"
+        },
+        {
+          "name": "QTZC",
+          "comment": "其他职称"
+        },
+        {
+          "name": "GZDWYW",
+          "comment": "工作单位英文名称"
+        },
+        {
+          "name": "GZDWZW",
+          "comment": "工作单位中文名称"
+        },
+        {
+          "name": "LXDZ",
+          "comment": "联系地址"
+        },
+        {
+          "name": "LXDH",
+          "comment": "联系电话"
+        },
+        {
+          "name": "CZ",
+          "comment": "传真"
+        },
+        {
+          "name": "DZYJ",
+          "comment": "电子邮件"
+        },
+        {
+          "name": "ND",
+          "comment": "年度"
+        },
+        {
+          "name": "YQLFKSSJ",
+          "comment": "邀请来访开始时间"
+        },
+        {
+          "name": "YQLFJSSJ",
+          "comment": "邀请来访结束时间"
+        },
+        {
+          "name": "LFMD",
+          "comment": "来访目的"
+        },
+        {
+          "name": "HZLY",
+          "comment": "合作来源"
+        },
+        {
+          "name": "GCCZJLX",
+          "comment": "工程财政经费类型"
+        },
+        {
+          "name": "CJGJHYDBSF",
+          "comment": "参加国际会议代表身份"
+        },
+        {
+          "name": "RJKA",
+          "comment": "入境口岸"
+        },
+        {
+          "name": "CJKA",
+          "comment": "出境口岸"
+        },
+        {
+          "name": "ZJYCLFKSRQ",
+          "comment": "专家原计划来访开始日期"
+        },
+        {
+          "name": "ZJYCLFJSRQ",
+          "comment": "专家原计划来访结束日期"
+        },
+        {
+          "name": "BLQZSZSG",
+          "comment": "办理签证所在使馆"
+        },
+        {
+          "name": "ZSDD",
+          "comment": "住宿地点"
+        },
+        {
+          "name": "ZSDDDH",
+          "comment": "住宿地点电话"
+        },
+        {
+          "name": "SFWSFWX",
+          "comment": "是否为随访外校"
+        },
+        {
+          "name": "ZQDW",
+          "comment": "主请单位"
+        },
+        {
+          "name": "SFWZJGMSWC",
+          "comment": "是否为子机构免税外专"
+        },
+        {
+          "name": "SQGMSWCLY",
+          "comment": "申请免税外专理由"
+        },
+        {
+          "name": "FYLY",
+          "comment": "费用来源"
+        },
+        {
+          "name": "FYJE",
+          "comment": "费用金额"
+        },
+        {
+          "name": "XMMC",
+          "comment": "项目名称"
+        },
+        {
+          "name": "XMFZR",
+          "comment": "项目负责人"
+        },
+        {
+          "name": "CWZH",
+          "comment": "财务账号"
+        },
+        {
+          "name": "YQRXM",
+          "comment": "邀请人姓名"
+        },
+        {
+          "name": "YQRDW",
+          "comment": "邀请人单位"
+        },
+        {
+          "name": "ZJGZFS",
+          "comment": "专家工作方式"
+        },
+        {
+          "name": "SBR",
+          "comment": "申报人"
+        },
+        {
+          "name": "ZB",
+          "comment": "洲别"
+        },
+        {
+          "name": "SBRGH",
+          "comment": "申报人工号"
+        },
+        {
+          "name": "SBRDWBM",
+          "comment": "申报人单位编码"
+        },
+        {
+          "name": "YQRGH",
+          "comment": "邀请人工号"
+        },
+        {
+          "name": "WID",
+          "comment": "唯一标识"
+        },
+        {
+          "name": "CZLX",
+          "comment": "操作类型"
+        },
+        {
+          "name": "CLRQ",
+          "comment": "处理日期"
+        }
+      ],
+      "sample_values": {
+        "ND": [
+          "2024",
+          "2025",
+          "2019",
+          "2023",
+          "2021",
+          "2018",
+          "2022",
+          "2020",
+          "2026"
+        ],
+        "GJHDQ": [
+          "美国",
+          "德国",
+          "巴西",
+          "英国",
+          "澳大利亚",
+          "中国",
+          "荷兰",
+          "日本",
+          "加拿大",
+          "韩国"
+        ],
+        "ZW": [
+          "无",
+          "教授",
+          "教师",
+          "主任",
+          "系主任",
+          "院长",
+          "博士在读",
+          "在读硕士",
+          "副校长",
+          "副院长"
+        ],
+        "ZC": [
+          "教授",
+          "其它",
+          "副教授",
+          "研究员",
+          "博士",
+          "助理教授",
+          "讲师",
+          "助理研究员",
+          "副研究员",
+          "助教"
+        ],
+        "LFMD": [
+          "学术访问",
+          "讲座讲学",
+          "合作研究",
+          "学术会议",
+          "培训进修",
+          "学术访问,学术会议",
+          "学术访问,合作研究",
+          "专业教学",
+          "学术访问,讲座讲学",
+          "合作研究,讲座讲学"
+        ],
+        "ZQDW": [
+          "中国农业大学",
+          "杨凌示范区外事办",
+          "南京农业大学",
+          "中国公共外交协会",
+          "北京大学",
+          "西北农林科技大学",
+          "北京基业长青社会组织服务中心",
+          "清华大学",
+          "海南种业大会",
+          "甘肃省水利科学研究院"
+        ]
+      }
+    }
+  }
+}

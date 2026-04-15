@@ -30,6 +30,10 @@ class SQLGeneratorService:
 
         if plan.intent_type == "attribute_lookup":
             return self._generate_attribute_lookup_sql(plan)
+        if plan.intent_type == "record_lookup":
+            return self._generate_record_lookup_sql(plan)
+        if plan.intent_type in {"roster", "detail"}:
+            return self._generate_projection_sql(plan)
 
         if plan.resolved_metric is not None and plan.metric_id is not None:
             return self._generate_structured_metric_sql(plan)
@@ -85,7 +89,14 @@ class SQLGeneratorService:
             sql_parts.append(f"WHERE {' AND '.join(where_clauses)}")
         if group_parts:
             sql_parts.append(f"GROUP BY {', '.join(group_parts)}")
-            sql_parts.append("ORDER BY total DESC")
+            if plan.sort_expressions:
+                sql_parts.append(f"ORDER BY {', '.join(plan.sort_expressions)}")
+            elif plan.intent_type == "trend":
+                sql_parts.append(f"ORDER BY {group_parts[0]} ASC")
+            else:
+                sql_parts.append("ORDER BY total DESC")
+            if plan.result_limit is not None:
+                sql_parts.append(f"LIMIT {max(1, min(200, plan.result_limit))}")
 
         return SQLGenerationPayload(
             generated=True,
@@ -109,6 +120,10 @@ class SQLGeneratorService:
 
         if plan.intent_type == "attribute_lookup":
             return self._generate_attribute_lookup_sql(plan, table_override=table)
+        if plan.intent_type == "record_lookup":
+            return self._generate_record_lookup_sql(plan, table_override=table)
+        if plan.intent_type in {"roster", "detail"}:
+            return self._generate_projection_sql(plan, table_override=table)
 
         if plan.intent_type == "metric":
             return SQLGenerationPayload(
@@ -190,6 +205,103 @@ class SQLGeneratorService:
             generated=True,
             sql=" ".join(sql_parts),
             strategy="attribute_lookup",
+            reason=None,
+        )
+
+    def _generate_record_lookup_sql(
+        self,
+        plan: QueryPlanPayload,
+        table_override: str | None = None,
+    ) -> SQLGenerationPayload:
+        identifier = plan.lookup_identifier
+        attributes = plan.lookup_attributes
+        if identifier is None:
+            return SQLGenerationPayload(
+                generated=False,
+                sql=None,
+                strategy=None,
+                reason="Record lookup plan is missing identifier metadata",
+            )
+        if not attributes:
+            return SQLGenerationPayload(
+                generated=False,
+                sql=None,
+                strategy=None,
+                reason="Record lookup plan is missing result columns",
+            )
+
+        table_name = table_override or identifier.table
+        select_parts = []
+        for attribute in attributes:
+            alias = attribute.output_alias or attribute.dimension_id
+            select_parts.append(f"{attribute.expression} AS {alias}")
+
+        where_clauses = [filter_payload.expression for filter_payload in plan.filters]
+        if not where_clauses:
+            where_clauses.append(
+                f"{identifier.expression} = '{self._escape_sql_literal(identifier.value)}'"
+            )
+
+        order_expression = None
+        if table_name in {"t_bsdt_jzgygcg", "t_bsdt_xsygcg"}:
+            order_expression = (
+                f"CASE WHEN {table_name}.CFNF IS NULL OR {table_name}.CFNF = '' "
+                f"THEN 1 ELSE 0 END, {table_name}.CFNF DESC"
+            )
+
+        sql_parts = [f"SELECT {', '.join(select_parts)}", f"FROM {table_name}"]
+        sql_parts.extend(step.join_sql for step in plan.join_plan)
+        sql_parts.append(f"WHERE {' AND '.join(where_clauses)}")
+        if order_expression is not None:
+            sql_parts.append(f"ORDER BY {order_expression}")
+        sql_parts.append("LIMIT 50")
+        return SQLGenerationPayload(
+            generated=True,
+            sql=" ".join(sql_parts),
+            strategy="record_lookup",
+            reason=None,
+        )
+
+    def _generate_projection_sql(
+        self,
+        plan: QueryPlanPayload,
+        table_override: str | None = None,
+    ) -> SQLGenerationPayload:
+        table_name = table_override or (plan.candidate_tables[0] if plan.candidate_tables else None)
+        if not table_name:
+            return SQLGenerationPayload(
+                generated=False,
+                sql=None,
+                strategy=None,
+                reason="Projection query needs a resolved table",
+            )
+
+        projection_fields = plan.lookup_attributes or plan.dimensions
+        select_clause = "*"
+        if projection_fields:
+            select_clause = ", ".join(
+                f"{field.expression} AS {field.output_alias or field.dimension_id}"
+                for field in projection_fields
+            )
+
+        sql_parts = [f"SELECT {select_clause}", f"FROM {table_name}"]
+        sql_parts.extend(step.join_sql for step in plan.join_plan)
+
+        where_clauses = [filter_payload.expression for filter_payload in plan.filters]
+        if plan.time_scope is not None and plan.time_scope.field and plan.time_scope.value is not None:
+            where_clauses.append(
+                f"{plan.time_scope.field} = '{self._escape_sql_literal(plan.time_scope.value)}'"
+            )
+        if where_clauses:
+            sql_parts.append(f"WHERE {' AND '.join(where_clauses)}")
+
+        if plan.sort_expressions:
+            sql_parts.append(f"ORDER BY {', '.join(plan.sort_expressions)}")
+        sql_parts.append(f"LIMIT {max(1, min(200, plan.result_limit or 50))}")
+        return SQLGenerationPayload(
+            generated=True,
+            sql=" ".join(sql_parts),
+            strategy="projection_query",
             reason=None,
         )
 

@@ -56,7 +56,9 @@ class RankedSQLCandidatePayload(BaseModel):
 
 class QueryPlanPayload(BaseModel):
     query_text: str
+    rewritten_query_text: str | None = None
     intent_type: str
+    answer_mode: str | None = None
     summary: str
     degraded: bool = False
     error_code: str | None = None
@@ -82,6 +84,10 @@ class QueryPlanPayload(BaseModel):
     ranked_sql_candidates: list[RankedSQLCandidatePayload] = Field(default_factory=list)
     lookup_identifier: "LookupIdentifierPayload | None" = None
     lookup_attributes: list[ResolvedDimensionPayload] = Field(default_factory=list)
+    lookup_record_label: str | None = None
+    result_limit: int | None = None
+    sort_expressions: list[str] = Field(default_factory=list)
+    resolved_entities: list[dict[str, str]] = Field(default_factory=list)
 
 
 class LookupIdentifierPayload(BaseModel):

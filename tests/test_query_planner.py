@@ -211,3 +211,43 @@ def test_query_planner_requests_clarification_when_identifier_attributes_span_mu
     assert payload.clarification_required is True
     assert payload.clarification_reason == "Requested attributes are not available from a single authoritative table"
 
+
+def test_query_planner_routes_identifier_record_lookup_before_semantic_retrieval() -> None:
+    vector_locator = FakeVectorLocatorService({"matches": []})
+    sql_rag = FakeSQLRAGService({"candidates": []})
+    planner = QueryPlannerService(vector_locator=vector_locator, sql_rag=sql_rag)
+
+    payload = planner.plan(
+        query_text="\u5de5\u53f787024\u7684\u51fa\u56fd\u8bb0\u5f55",
+        query_vector=[0.9, 0.2],
+    )
+
+    assert vector_locator.calls == []
+    assert sql_rag.calls == []
+    assert payload.intent_type == "record_lookup"
+    assert payload.clarification_required is False
+    assert payload.lookup_identifier is not None
+    assert payload.lookup_identifier.table == "t_bsdt_jzgygcg"
+    assert payload.lookup_identifier.column == "ZGH"
+    assert payload.lookup_identifier.value == "87024"
+    assert payload.candidate_tables == ["t_bsdt_jzgygcg"]
+    assert payload.lookup_record_label == "\u51fa\u56fd\u8bb0\u5f55"
+    assert payload.filters[0].expression == "t_bsdt_jzgygcg.ZGH = '87024'"
+
+
+def test_query_planner_clarifies_bare_identifier_lookup() -> None:
+    vector_locator = FakeVectorLocatorService({"matches": []})
+    sql_rag = FakeSQLRAGService({"candidates": []})
+    planner = QueryPlannerService(vector_locator=vector_locator, sql_rag=sql_rag)
+
+    payload = planner.plan(
+        query_text="查一下87024的信息",
+        query_vector=[0.2, 0.3],
+    )
+
+    assert vector_locator.calls == []
+    assert sql_rag.calls == []
+    assert payload.answer_mode == "clarification"
+    assert payload.clarification_required is True
+    assert "工号或学号" in payload.clarification_questions[0]
+

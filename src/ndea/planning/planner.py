@@ -2,7 +2,16 @@ from collections.abc import Iterable
 import re
 from typing import Any
 
-from ndea.planning.attribute_lookup import build_attribute_lookup_plan
+from ndea.planning.attribute_lookup import (
+    build_attribute_lookup_plan,
+    build_record_lookup_plan,
+)
+from ndea.planning.query_router import (
+    build_identifier_clarification_plan,
+    build_registry_metric_plan,
+    build_roster_or_detail_plan,
+    rewrite_query_text,
+)
 from ndea.planning.models import (
     JoinPlanStepPayload,
     QueryPlanPayload,
@@ -33,14 +42,46 @@ class QueryPlannerService:
         request_context: dict[str, object] | None = None,
     ) -> QueryPlanPayload:
         planning_context = self._read_mapping(request_context or {}, "planning_context")
-        attribute_lookup_plan = build_attribute_lookup_plan(query_text)
+        normalized_query_text = rewrite_query_text(query_text, request_context)
+        identifier_clarification_plan = build_identifier_clarification_plan(
+            query_text=query_text,
+            request_context=request_context,
+        )
+        if identifier_clarification_plan is not None:
+            return identifier_clarification_plan
+        record_lookup_plan = build_record_lookup_plan(normalized_query_text)
+        if record_lookup_plan is not None:
+            record_lookup_plan.query_text = query_text
+            record_lookup_plan.rewritten_query_text = normalized_query_text
+            record_lookup_plan.answer_mode = "record_lookup"
+            return record_lookup_plan
+        attribute_lookup_plan = build_attribute_lookup_plan(normalized_query_text)
         if attribute_lookup_plan is not None:
+            attribute_lookup_plan.query_text = query_text
+            attribute_lookup_plan.rewritten_query_text = normalized_query_text
+            attribute_lookup_plan.answer_mode = (
+                "clarification"
+                if attribute_lookup_plan.clarification_required
+                else "attribute_lookup"
+            )
             return attribute_lookup_plan
+        roster_or_detail_plan = build_roster_or_detail_plan(
+            query_text=query_text,
+            request_context=request_context,
+        )
+        if roster_or_detail_plan is not None:
+            return roster_or_detail_plan
+        registry_metric_plan = build_registry_metric_plan(
+            query_text=query_text,
+            request_context=request_context,
+        )
+        if registry_metric_plan is not None:
+            return registry_metric_plan
         degraded = False
         degradation_reasons: list[str] = []
         try:
             vector_payload = self._vector_locator.locate(
-                query_text=query_text,
+                query_text=normalized_query_text,
                 query_vector=query_vector,
                 asset_types=[
                     "metric",
@@ -59,7 +100,7 @@ class QueryPlannerService:
 
         try:
             sql_payload = self._sql_rag.retrieve(
-                query_text=query_text,
+                query_text=normalized_query_text,
                 query_vector=query_vector,
                 limit=20,
             )
@@ -97,9 +138,9 @@ class QueryPlannerService:
         candidate_tables = self._collect_candidate_tables(matches, candidates)
         candidate_metrics = self._collect_candidate_metrics(matches)
         join_hints = self._collect_join_hints(matches)
-        intent_type = self._classify_intent(query_text)
+        intent_type = self._classify_intent(normalized_query_text)
 
-        metric_contract, confidence = self._resolve_metric_contract(query_text, metric_contracts)
+        metric_contract, confidence = self._resolve_metric_contract(normalized_query_text, metric_contracts)
         dimensions: list[ResolvedDimensionPayload] = []
         filters: list[ResolvedFilterPayload] = []
         time_scope: ResolvedTimeScopePayload | None = None
@@ -132,7 +173,7 @@ class QueryPlannerService:
                 entity_scope=entity_scope,
             )
             candidate_metrics = self._unique_strings([metric_contract.name] + candidate_metrics)
-            dimensions = self._resolve_dimensions(query_text, dimension_contracts, metric_contract, planning_context)
+            dimensions = self._resolve_dimensions(normalized_query_text, dimension_contracts, metric_contract, planning_context)
             filters = [
                 ResolvedFilterPayload(
                     filter_id=f"default_filter_{index + 1}",
@@ -142,14 +183,14 @@ class QueryPlannerService:
                 for index, expression in enumerate(metric_contract.default_filters)
             ]
             dimension_value_filters, filter_tables = self._resolve_dimension_value_filters(
-                query_text=query_text,
+                query_text=normalized_query_text,
                 contracts=dimension_contracts,
                 metric_contract=metric_contract,
                 planning_context=planning_context,
             )
             filters.extend(dimension_value_filters)
             time_scope = self._resolve_time_scope(
-                query_text=query_text,
+                query_text=normalized_query_text,
                 planning_context=planning_context,
                 metric_contract=metric_contract,
                 time_semantics_catalog=time_semantics_catalog,
@@ -228,7 +269,9 @@ class QueryPlannerService:
 
         return QueryPlanPayload(
             query_text=query_text,
+            rewritten_query_text=normalized_query_text,
             intent_type=intent_type,
+            answer_mode="clarification" if clarification_required else "aggregate",
             summary=summary,
             degraded=degraded,
             error_code=(

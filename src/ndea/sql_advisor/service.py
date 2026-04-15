@@ -22,14 +22,26 @@ class VannaStyleSQLAdvisorService:
         plan: QueryPlanPayload,
         query_vector: list[float] | None = None,
     ) -> SQLAdvisoryPayload:
-        if plan.intent_type == "attribute_lookup":
+        if plan.intent_type in {"attribute_lookup", "record_lookup", "roster", "detail"}:
+            strategy_map = {
+                "attribute_lookup": "attribute_lookup_passthrough",
+                "record_lookup": "record_lookup_passthrough",
+                "roster": "projection_query_passthrough",
+                "detail": "projection_query_passthrough",
+            }
+            note_map = {
+                "attribute_lookup": "Bypassed SQL exemplar selection for identifier attribute lookup",
+                "record_lookup": "Bypassed SQL exemplar selection for identifier record lookup",
+                "roster": "Bypassed SQL exemplar selection for registry-backed projection query",
+                "detail": "Bypassed SQL exemplar selection for registry-backed projection query",
+            }
             return SQLAdvisoryPayload(
                 selected_sql=None,
                 selected_sql_asset_id=None,
-                strategy="attribute_lookup_passthrough",
+                strategy=strategy_map[plan.intent_type],
                 confidence=1.0,
                 examples=[],
-                notes=["Bypassed SQL exemplar selection for identifier attribute lookup"],
+                notes=[note_map[plan.intent_type]],
             )
 
         examples = self._examples_from_plan(plan)

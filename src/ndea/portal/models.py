@@ -20,6 +20,11 @@ class PortalQueryMetadataPayload(BaseModel):
     confidence: float | None = None
     selected_sql_asset_id: str | None = None
     metric_id: str | None = None
+    answer_mode: str | None = None
+    resolved_tables: list[str] = Field(default_factory=list)
+    resolved_entities: list[dict[str, str]] = Field(default_factory=list)
+    sql_strategy: str | None = None
+    clarification_reason: str | None = None
 
 
 class PortalQueryPayload(BaseModel):

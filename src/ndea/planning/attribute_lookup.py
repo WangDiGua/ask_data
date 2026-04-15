@@ -52,6 +52,30 @@ class AttributeDefinition:
 
 
 @dataclass(frozen=True)
+class RecordColumnBinding:
+    name: str
+    table: str
+    column: str
+    output_alias: str
+
+    @property
+    def expression(self) -> str:
+        return f"{self.table}.{self.column}"
+
+
+@dataclass(frozen=True)
+class RecordDefinition:
+    record_id: str
+    name: str
+    aliases: tuple[str, ...]
+    identifier_type: str
+    table: str
+    identifier_column: str
+    columns: tuple[RecordColumnBinding, ...]
+    priority: int
+
+
+@dataclass(frozen=True)
 class IdentifierMatch:
     binding: IdentifierBinding
     value: str
@@ -174,6 +198,66 @@ DEFAULT_ATTRIBUTES_BY_IDENTIFIER: dict[str, tuple[str, ...]] = {
 }
 
 
+RECORD_DEFINITIONS: tuple[RecordDefinition, ...] = (
+    RecordDefinition(
+        "staff_outbound_records",
+        "\u51fa\u56fd\u8bb0\u5f55",
+        (
+            "\u51fa\u56fd\u8bb0\u5f55",
+            "\u56e0\u516c\u51fa\u56fd\u8bb0\u5f55",
+            "\u51fa\u56fd\u660e\u7ec6",
+            "\u56e0\u516c\u51fa\u56fd\u660e\u7ec6",
+            "\u51fa\u8bbf\u8bb0\u5f55",
+            "\u51fa\u8bbf\u660e\u7ec6",
+        ),
+        "staff_no",
+        "t_bsdt_jzgygcg",
+        "ZGH",
+        (
+            RecordColumnBinding("\u59d3\u540d", "t_bsdt_jzgygcg", "XM", "name"),
+            RecordColumnBinding("\u5e74\u4efd", "t_bsdt_jzgygcg", "NF", "year"),
+            RecordColumnBinding("\u6d3e\u51fa\u5355\u4f4d", "t_bsdt_jzgygcg", "PCDW", "dispatch_org_name"),
+            RecordColumnBinding("\u51fa\u8bbf\u4efb\u52a1\u7c7b\u578b", "t_bsdt_jzgygcg", "CFRWLX", "mission_type"),
+            RecordColumnBinding("\u51fa\u8bbf\u56fd\u5bb6\u5730\u533a", "t_bsdt_jzgygcg", "CFGJHDQ", "country_region"),
+            RecordColumnBinding("\u51fa\u53d1\u65e5\u671f", "t_bsdt_jzgygcg", "CFNF", "depart_date"),
+            RecordColumnBinding("\u6210\u884c\u65e5\u671f", "t_bsdt_jzgygcg", "CJSJ", "start_date"),
+            RecordColumnBinding("\u5165\u5883\u65e5\u671f", "t_bsdt_jzgygcg", "RJSJ", "return_date"),
+            RecordColumnBinding("\u9080\u8bf7\u5355\u4f4d", "t_bsdt_jzgygcg", "YQRDWZWMC", "host_org_name"),
+            RecordColumnBinding("\u6279\u4ef6\u53f7", "t_bsdt_jzgygcg", "PJH", "approval_number"),
+        ),
+        100,
+    ),
+    RecordDefinition(
+        "student_outbound_records",
+        "\u51fa\u56fd\u8bb0\u5f55",
+        (
+            "\u51fa\u56fd\u8bb0\u5f55",
+            "\u56e0\u516c\u51fa\u56fd\u8bb0\u5f55",
+            "\u51fa\u56fd\u660e\u7ec6",
+            "\u56e0\u516c\u51fa\u56fd\u660e\u7ec6",
+            "\u51fa\u8bbf\u8bb0\u5f55",
+            "\u51fa\u8bbf\u660e\u7ec6",
+        ),
+        "student_no",
+        "t_bsdt_xsygcg",
+        "ZGH",
+        (
+            RecordColumnBinding("\u59d3\u540d", "t_bsdt_xsygcg", "XM", "name"),
+            RecordColumnBinding("\u5e74\u4efd", "t_bsdt_xsygcg", "NF", "year"),
+            RecordColumnBinding("\u6d3e\u51fa\u5355\u4f4d", "t_bsdt_xsygcg", "PCDW", "dispatch_org_name"),
+            RecordColumnBinding("\u51fa\u8bbf\u4efb\u52a1\u7c7b\u578b", "t_bsdt_xsygcg", "CFRWLX", "mission_type"),
+            RecordColumnBinding("\u51fa\u8bbf\u56fd\u5bb6\u5730\u533a", "t_bsdt_xsygcg", "CFGJHDQ", "country_region"),
+            RecordColumnBinding("\u51fa\u53d1\u65e5\u671f", "t_bsdt_xsygcg", "CFNF", "depart_date"),
+            RecordColumnBinding("\u6210\u884c\u65e5\u671f", "t_bsdt_xsygcg", "CJSJ", "start_date"),
+            RecordColumnBinding("\u5165\u5883\u65e5\u671f", "t_bsdt_xsygcg", "RJSJ", "return_date"),
+            RecordColumnBinding("\u9080\u8bf7\u5355\u4f4d", "t_bsdt_xsygcg", "YQRDWZWMC", "host_org_name"),
+            RecordColumnBinding("\u6279\u4ef6\u53f7", "t_bsdt_xsygcg", "PJH", "approval_number"),
+        ),
+        95,
+    ),
+)
+
+
 def build_attribute_lookup_plan(query_text: str) -> QueryPlanPayload | None:
     requested_attributes = _extract_requested_attributes(query_text)
     identifier_matches = _extract_identifier_matches(query_text, requested_attributes)
@@ -245,6 +329,70 @@ def build_attribute_lookup_plan(query_text: str) -> QueryPlanPayload | None:
         chosen_strategy="identifier_attribute_lookup",
         lookup_identifier=lookup_identifier,
         lookup_attributes=lookup_attributes,
+    )
+
+
+def build_record_lookup_plan(query_text: str) -> QueryPlanPayload | None:
+    identifier_matches = _extract_explicit_identifier_matches(query_text)
+    if not identifier_matches:
+        identifier_matches = _extract_generic_identifier_matches(query_text)
+    if not identifier_matches:
+        return None
+
+    selected_definition, selected_identifier = _resolve_record_lookup_candidate(
+        query_text,
+        identifier_matches,
+    )
+    if selected_definition is None or selected_identifier is None:
+        return None
+
+    lookup_identifier = LookupIdentifierPayload(
+        identifier_type=selected_identifier.binding.identifier_type,
+        label=selected_identifier.binding.label,
+        table=selected_definition.table,
+        column=selected_definition.identifier_column,
+        expression=f"{selected_definition.table}.{selected_definition.identifier_column}",
+        value=selected_identifier.value,
+    )
+    lookup_attributes = [
+        ResolvedDimensionPayload(
+            dimension_id=column.output_alias,
+            name=column.name,
+            expression=column.expression,
+            output_alias=column.output_alias,
+            table=column.table,
+        )
+        for column in selected_definition.columns
+    ]
+
+    return QueryPlanPayload(
+        query_text=query_text,
+        intent_type="record_lookup",
+        summary=(
+            f"Resolved {selected_definition.name} lookup for "
+            f"{selected_identifier.binding.label} {selected_identifier.value}"
+        ),
+        clarification_required=False,
+        clarification_reason=None,
+        candidate_tables=[selected_definition.table],
+        candidate_metrics=[],
+        join_hints=[],
+        selected_sql_asset_id=None,
+        selected_sql=None,
+        filters=[
+            ResolvedFilterPayload(
+                filter_id=f"{selected_identifier.binding.identifier_type}_record_lookup",
+                expression=(
+                    f"{selected_definition.table}.{selected_definition.identifier_column} = "
+                    f"'{_escape_sql_literal(selected_identifier.value)}'"
+                ),
+                source="identifier_record_lookup",
+            )
+        ],
+        chosen_strategy="identifier_record_lookup",
+        lookup_identifier=lookup_identifier,
+        lookup_attributes=lookup_attributes,
+        lookup_record_label=selected_definition.name,
     )
 
 
@@ -375,6 +523,31 @@ def _resolve_best_candidate(
     if best_match is None:
         return None
     return best_match[2], best_match[3]
+
+
+def _resolve_record_lookup_candidate(
+    query_text: str,
+    identifier_matches: list[IdentifierMatch],
+) -> tuple[RecordDefinition | None, IdentifierMatch | None]:
+    best_definition: RecordDefinition | None = None
+    best_identifier: IdentifierMatch | None = None
+    best_score: int | None = None
+    for definition in RECORD_DEFINITIONS:
+        if not any(alias in query_text for alias in definition.aliases):
+            continue
+        for identifier_match in identifier_matches:
+            if identifier_match.binding.identifier_type != definition.identifier_type:
+                continue
+            if identifier_match.binding.table != definition.table:
+                continue
+            score = definition.priority + identifier_match.binding.priority
+            if identifier_match.generic:
+                score -= 10
+            if best_score is None or score > best_score:
+                best_definition = definition
+                best_identifier = identifier_match
+                best_score = score
+    return best_definition, best_identifier
 
 
 def _ordered_candidate_tables(identifier_matches: list[IdentifierMatch]) -> list[str]:

@@ -43,6 +43,14 @@ class ResponseAssemblerService:
             attribute_text = self._build_attribute_lookup_text(execution, plan)
             if attribute_text is not None:
                 return attribute_text
+        if plan.intent_type == "record_lookup":
+            record_text = self._build_record_lookup_text(execution, plan)
+            if record_text is not None:
+                return record_text
+        if plan.intent_type in {"roster", "detail"}:
+            projection_text = self._build_projection_lookup_text(execution, plan)
+            if projection_text is not None:
+                return projection_text
         summary = execution.get("summary")
         if isinstance(summary, dict):
             return TextPayload.model_validate(summary)
@@ -136,3 +144,74 @@ class ResponseAssemblerService:
             for attribute in plan.lookup_attributes
         )
         return TextPayload(summary=f"{identifier.label}{identifier.value}的查询结果如下", details=details or None)
+
+    def _build_record_lookup_text(
+        self,
+        execution: dict[str, Any],
+        plan: QueryPlanPayload,
+    ) -> TextPayload | None:
+        table = execution.get("table")
+        if not isinstance(table, dict):
+            return None
+        rows = table.get("rows")
+        if not isinstance(rows, list):
+            return None
+
+        identifier = plan.lookup_identifier
+        if identifier is None:
+            return None
+
+        record_label = plan.lookup_record_label or "记录"
+        if not rows:
+            return TextPayload(summary=f"{identifier.label}{identifier.value}未查询到{record_label}")
+
+        detail_lines: list[str] = []
+        for index, row in enumerate(rows[:5], start=1):
+            if not isinstance(row, dict):
+                continue
+            fragments: list[str] = []
+            for attribute in plan.lookup_attributes:
+                alias = attribute.output_alias or attribute.dimension_id
+                value = row.get(alias)
+                if value in (None, ""):
+                    continue
+                fragments.append(f"{attribute.name}={value}")
+            if fragments:
+                detail_lines.append(f"{index}. {'；'.join(fragments)}")
+
+        details = "\n".join(detail_lines) if detail_lines else None
+        if len(rows) > 5:
+            extra = f"其余{len(rows) - 5}条请查看数据表。"
+            details = f"{details}\n{extra}" if details else extra
+
+        return TextPayload(
+            summary=f"{identifier.label}{identifier.value}的{record_label}共{len(rows)}条",
+            details=details,
+        )
+
+    def _build_projection_lookup_text(
+        self,
+        execution: dict[str, Any],
+        plan: QueryPlanPayload,
+    ) -> TextPayload | None:
+        table = execution.get("table")
+        if not isinstance(table, dict):
+            return None
+        rows = table.get("rows")
+        if not isinstance(rows, list):
+            return None
+
+        label = plan.lookup_record_label or ("名单" if plan.intent_type == "roster" else "明细")
+        if not rows:
+            return TextPayload(summary=f"未查询到{label}")
+
+        if plan.intent_type == "roster":
+            return TextPayload(
+                summary=f"查询到{len(rows)}条{label}",
+                details="请查看数据表获取完整名单。",
+            )
+
+        return TextPayload(
+            summary=f"查询到{len(rows)}条{label}",
+            details="请查看数据表获取完整明细。",
+        )
