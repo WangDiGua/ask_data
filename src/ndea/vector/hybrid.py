@@ -8,9 +8,9 @@ from ndea.config import Settings
 
 class HybridSearchScorer:
     def __init__(self, settings: Settings) -> None:
-        self._vector_weight = settings.qdrant_hybrid_vector_weight
-        self._keyword_weight = settings.qdrant_hybrid_keyword_weight
-        self._exact_match_boost = settings.qdrant_hybrid_exact_match_boost
+        self._vector_weight = settings.milvus_hybrid_vector_weight
+        self._keyword_weight = settings.milvus_hybrid_keyword_weight
+        self._exact_match_boost = settings.milvus_hybrid_exact_match_boost
 
     def score(
         self,

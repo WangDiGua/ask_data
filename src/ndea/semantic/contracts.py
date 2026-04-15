@@ -33,6 +33,7 @@ class DimensionContract(BaseModel):
     expression: str
     groupable: bool = True
     output_alias: str | None = None
+    sample_values: list[str] = Field(default_factory=list)
 
 
 class JoinPathContract(BaseModel):

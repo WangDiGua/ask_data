@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from ndea.config import Settings
 from ndea.metadata.mysql_client import open_mysql_connection
-from ndea.vector.qdrant_client import open_qdrant_client
+from ndea.vector.milvus_client import open_milvus_client
 
 
 class DependencyHealth(BaseModel):
@@ -57,7 +57,7 @@ def get_health_service(settings: Settings | None = None) -> HealthService:
 def _default_dependency_checkers(settings: Settings) -> list[Callable[[], DependencyHealth]]:
     return [
         lambda: _check_mysql_dependency(settings),
-        lambda: _check_qdrant_dependency(settings),
+        lambda: _check_milvus_dependency(settings),
     ]
 
 
@@ -72,24 +72,27 @@ def _check_mysql_dependency(settings: Settings) -> DependencyHealth:
         return DependencyHealth(name="mysql", healthy=False, required=True, details=str(exc))
 
 
-def _check_qdrant_dependency(settings: Settings) -> DependencyHealth:
+def _check_milvus_dependency(settings: Settings) -> DependencyHealth:
     if not settings.enable_semantic_retrieval:
-        return DependencyHealth(name="qdrant", healthy=True, required=False, details="disabled")
+        return DependencyHealth(name="milvus", healthy=True, required=False, details="disabled")
     try:
-        client = open_qdrant_client(settings)
-        if hasattr(client, "collection_exists"):
-            exists = client.collection_exists(settings.qdrant_collection)
-            if not exists:
-                if hasattr(client, "close"):
-                    client.close()
-                return DependencyHealth(
-                    name="qdrant",
-                    healthy=False,
-                    required=True,
-                    details=f"collection {settings.qdrant_collection} not found",
-                )
+        client = open_milvus_client(settings)
+        exists = True
+        if hasattr(client, "has_collection"):
+            exists = client.has_collection(settings.milvus_collection)
+        elif hasattr(client, "collection_exists"):
+            exists = client.collection_exists(settings.milvus_collection)
+        if not exists:
+            if hasattr(client, "close"):
+                client.close()
+            return DependencyHealth(
+                name="milvus",
+                healthy=False,
+                required=True,
+                details=f"collection {settings.milvus_collection} not found",
+            )
         if hasattr(client, "close"):
             client.close()
-        return DependencyHealth(name="qdrant", healthy=True, required=True, details="ok")
+        return DependencyHealth(name="milvus", healthy=True, required=True, details="ok")
     except Exception as exc:  # pragma: no cover - exercised via tests with injected services
-        return DependencyHealth(name="qdrant", healthy=False, required=True, details=str(exc))
+        return DependencyHealth(name="milvus", healthy=False, required=True, details=str(exc))

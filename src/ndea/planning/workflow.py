@@ -383,8 +383,8 @@ class QueryWorkflowService:
             mysql_status = "healthy"
             if self._read_error_code(execution_payload or {}) == "service_unavailable":
                 mysql_status = "unavailable"
-        qdrant_status = "degraded" if payload.plan.degraded else "healthy"
-        return {"mysql": mysql_status, "qdrant": qdrant_status}
+        milvus_status = "degraded" if payload.plan.degraded else "healthy"
+        return {"mysql": mysql_status, "milvus": milvus_status}
 
     def _final_status(self, payload: QueryWorkflowPayload) -> str:
         if payload.executed and payload.error_code is None:

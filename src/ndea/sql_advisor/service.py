@@ -27,10 +27,11 @@ class VannaStyleSQLAdvisorService:
         selected_sql_asset_id = plan.selected_sql_asset_id
         confidence = plan.confidence
         strategy = None
+        allow_example_autoselect = plan.resolved_metric is None
 
         if examples:
             strategy = "vanna_style_ranked_examples"
-            if selected_sql is None:
+            if selected_sql is None and allow_example_autoselect:
                 top_example = examples[0]
                 selected_sql = top_example.sql
                 selected_sql_asset_id = top_example.asset_id
@@ -55,7 +56,7 @@ class VannaStyleSQLAdvisorService:
             if rag_examples:
                 examples = rag_examples
                 strategy = "vanna_style_retrieval"
-                if selected_sql is None:
+                if selected_sql is None and allow_example_autoselect:
                     selected_sql = rag_examples[0].sql
                     selected_sql_asset_id = rag_examples[0].asset_id
                     confidence = rag_examples[0].score

@@ -46,7 +46,7 @@ class QueryPlannerService:
                     "dimension_contract",
                     "time_semantics",
                 ],
-                limit=None,
+                limit=50,
             )
         except Exception as exc:
             degraded = True
@@ -57,7 +57,7 @@ class QueryPlannerService:
             sql_payload = self._sql_rag.retrieve(
                 query_text=query_text,
                 query_vector=query_vector,
-                limit=None,
+                limit=20,
             )
         except Exception as exc:
             degraded = True
@@ -112,6 +112,7 @@ class QueryPlannerService:
         selected_candidate_reason: str | None = None
 
         clarification_required = False
+        ranked_sql_candidates: list[RankedSQLCandidatePayload] = []
         if metric_contract is not None:
             chosen_strategy = "metric_contract"
             if entity_scope is None:
@@ -136,14 +137,42 @@ class QueryPlannerService:
                 )
                 for index, expression in enumerate(metric_contract.default_filters)
             ]
+            dimension_value_filters, filter_tables = self._resolve_dimension_value_filters(
+                query_text=query_text,
+                contracts=dimension_contracts,
+                metric_contract=metric_contract,
+                planning_context=planning_context,
+            )
+            filters.extend(dimension_value_filters)
             time_scope = self._resolve_time_scope(
                 query_text=query_text,
                 planning_context=planning_context,
                 metric_contract=metric_contract,
                 time_semantics_catalog=time_semantics_catalog,
             )
-            join_plan = self._resolve_join_plan(metric_contract, dimensions, join_path_contracts)
-            candidate_tables = self._collect_contract_tables(metric_contract, dimensions, join_plan, candidate_tables)
+            join_plan = self._resolve_join_plan(
+                metric_contract=metric_contract,
+                dimensions=dimensions,
+                join_path_contracts=join_path_contracts,
+                extra_tables=filter_tables,
+            )
+            candidate_tables = self._collect_contract_tables(
+                metric_contract=metric_contract,
+                dimensions=dimensions,
+                join_plan=join_plan,
+                existing=candidate_tables,
+                extra_tables=filter_tables,
+            )
+            has_specific_filters = any(
+                filter_payload.source not in {None, "", "metric_default"}
+                for filter_payload in filters
+            ) or (
+                time_scope is not None
+                and (
+                    time_scope.value is not None
+                    or (time_scope.start is not None and time_scope.end is not None)
+                )
+            )
             ranked_sql_candidates = self._rank_sql_candidates(
                 candidates=candidates,
                 metric_contract=metric_contract,
@@ -151,10 +180,12 @@ class QueryPlannerService:
                 candidate_tables=candidate_tables,
                 time_scope=time_scope,
                 entity_scope=entity_scope,
+                has_specific_filters=has_specific_filters,
             )
             top_ranked_candidate = ranked_sql_candidates[0] if ranked_sql_candidates else None
             if (
-                top_ranked_candidate is not None
+                not has_specific_filters
+                and top_ranked_candidate is not None
                 and top_ranked_candidate.compatibility_score >= self._sql_selection_threshold
             ):
                 selected_sql_asset_id = top_ranked_candidate.asset_id
@@ -170,7 +201,6 @@ class QueryPlannerService:
             clarification_required = True
             clarification_reason = "Need more semantic grounding before planning SQL"
             clarification_questions = ["请补充你要统计的对象、时间范围或业务口径。"]
-            ranked_sql_candidates = []
         else:
             ranked_sql_candidates = self._rank_unstructured_sql_candidates(candidates)
             top_ranked_candidate = ranked_sql_candidates[0] if ranked_sql_candidates else None
@@ -230,9 +260,12 @@ class QueryPlannerService:
             return "comparison"
         if any(keyword in text for keyword in ("top ", "rank", "highest", "lowest", "most ", "least ")):
             return "ranking"
-        if any(keyword in text for keyword in ("trend", "over time", "by month", "by year", "monthly", "yearly", "daily", "weekly")):
+        if any(
+            keyword in text
+            for keyword in ("trend", "over time", "by month", "by year", "monthly", "yearly", "daily", "weekly", "趋势")
+        ):
             return "trend"
-        if any(keyword in text for keyword in ("list", "detail", "details", "show", "which", "who")):
+        if any(keyword in text for keyword in ("list", "detail", "details", "show", "which", "who", "明细", "名单")):
             return "detail"
         return "metric"
 
@@ -338,15 +371,18 @@ class QueryPlannerService:
         for item in direct_items:
             if isinstance(item, dict):
                 contracts.append(model_type.model_validate(item))
+            elif isinstance(item, model_type):
+                contracts.append(item)
 
         if contracts:
             return contracts
 
+        singular_field = field.removesuffix("s")
         for match in self._read_items(payload, "matches"):
             if self._read_text(match, "asset_type") != fallback_asset_type:
                 continue
             metadata = self._read_mapping(match, "metadata")
-            contract_payload = metadata.get(field.removesuffix("s"))
+            contract_payload = metadata.get(singular_field)
             if isinstance(contract_payload, dict):
                 contracts.append(model_type.model_validate(contract_payload))
         return contracts
@@ -387,12 +423,15 @@ class QueryPlannerService:
         requested = self._read_items(planning_context, "dimensions")
         requested_ids = {str(item) for item in requested if isinstance(item, str)}
         lowered = query_text.lower()
+        has_group_cue = self._has_group_cue(query_text)
         resolved: list[ResolvedDimensionPayload] = []
         for contract in contracts:
             if metric_contract.available_dimensions and contract.dimension_id not in metric_contract.available_dimensions:
                 continue
             aliases = [contract.name, *contract.aliases]
-            if contract.dimension_id in requested_ids or any(alias.lower() in lowered for alias in aliases if alias):
+            if contract.dimension_id in requested_ids or (
+                has_group_cue and any(alias.lower() in lowered for alias in aliases if alias)
+            ):
                 resolved.append(
                     ResolvedDimensionPayload(
                         dimension_id=contract.dimension_id,
@@ -403,6 +442,57 @@ class QueryPlannerService:
                     )
                 )
         return resolved
+
+    def _resolve_dimension_value_filters(
+        self,
+        query_text: str,
+        contracts: list[DimensionContract],
+        metric_contract: MetricContract,
+        planning_context: dict[str, Any],
+    ) -> tuple[list[ResolvedFilterPayload], list[str]]:
+        query_tokens = self._normalize_text(query_text)
+        filters: list[ResolvedFilterPayload] = []
+        filter_tables: list[str] = []
+        requested_filters = self._read_items(planning_context, "filters")
+
+        for index, raw_filter in enumerate(requested_filters, start=1):
+            if isinstance(raw_filter, str) and raw_filter.strip():
+                filters.append(
+                    ResolvedFilterPayload(
+                        filter_id=f"context_filter_{index}",
+                        expression=raw_filter.strip(),
+                        source="planning_context",
+                    )
+                )
+
+        seen_dimensions: set[str] = set()
+        for contract in contracts:
+            if metric_contract.available_dimensions and contract.dimension_id not in metric_contract.available_dimensions:
+                continue
+            if contract.dimension_id in seen_dimensions:
+                continue
+            matched_value: str | None = None
+            for sample_value in sorted(contract.sample_values, key=len, reverse=True):
+                normalized_value = self._normalize_text(sample_value)
+                if len(normalized_value) < 2:
+                    continue
+                if normalized_value in query_tokens:
+                    matched_value = sample_value
+                    break
+            if matched_value is None:
+                continue
+            filters.append(
+                ResolvedFilterPayload(
+                    filter_id=f"dimension_value_{contract.dimension_id}",
+                    expression=f"{contract.expression} = '{self._escape_sql_literal(matched_value)}'",
+                    source="dimension_value_match",
+                )
+            )
+            seen_dimensions.add(contract.dimension_id)
+            if contract.table and contract.table != metric_contract.base_table:
+                filter_tables.append(contract.table)
+
+        return filters, self._unique_strings(filter_tables)
 
     def _resolve_time_scope(
         self,
@@ -415,18 +505,30 @@ class QueryPlannerService:
         if isinstance(context_time_scope, dict):
             return ResolvedTimeScopePayload.model_validate(context_time_scope)
 
-        year_match = re.search(r"(20\d{2})学年", query_text)
-        if year_match and metric_contract.time_field:
+        if not metric_contract.time_field:
+            return None
+
+        academic_year_match = re.search(r"(20\d{2})学年", query_text)
+        if academic_year_match:
             return ResolvedTimeScopePayload(
                 scope_type="academic_year",
                 field=metric_contract.time_field,
+                value=academic_year_match.group(1),
+                label=f"{academic_year_match.group(1)}学年",
+            )
+
+        year_match = re.search(r"(20\d{2})年(?:度)?", query_text)
+        if year_match:
+            return ResolvedTimeScopePayload(
+                scope_type="year",
+                field=metric_contract.time_field,
                 value=year_match.group(1),
-                label=f"{year_match.group(1)}学年",
+                label=f"{year_match.group(1)}年",
             )
 
         for semantics in time_semantics_catalog:
             for alias in [semantics.name, *semantics.aliases]:
-                if alias and alias in query_text and metric_contract.time_field:
+                if alias and alias in query_text:
                     return ResolvedTimeScopePayload(
                         scope_type=semantics.default_grain or "time",
                         field=metric_contract.time_field,
@@ -439,12 +541,18 @@ class QueryPlannerService:
         metric_contract: MetricContract,
         dimensions: list[ResolvedDimensionPayload],
         join_path_contracts: list[JoinPathContract],
+        extra_tables: list[str] | None = None,
     ) -> list[JoinPlanStepPayload]:
         needed_tables = {
             dimension.table
             for dimension in dimensions
             if dimension.table and dimension.table != metric_contract.base_table
         }
+        needed_tables.update(
+            table
+            for table in (extra_tables or [])
+            if table and table != metric_contract.base_table
+        )
         resolved: list[JoinPlanStepPayload] = []
         for contract in join_path_contracts:
             if contract.disabled or contract.join_id not in metric_contract.join_path_ids:
@@ -467,6 +575,7 @@ class QueryPlannerService:
         dimensions: list[ResolvedDimensionPayload],
         join_plan: list[JoinPlanStepPayload],
         existing: list[str],
+        extra_tables: list[str] | None = None,
     ) -> list[str]:
         tables = [metric_contract.base_table]
         tables.extend(
@@ -478,6 +587,11 @@ class QueryPlannerService:
             step.right_table
             for step in join_plan
             if step.right_table and step.right_table != metric_contract.base_table
+        )
+        tables.extend(
+            table
+            for table in (extra_tables or [])
+            if table and table != metric_contract.base_table
         )
         tables.extend(existing)
         return self._unique_strings([table for table in tables if table])
@@ -491,7 +605,7 @@ class QueryPlannerService:
         questions: list[str] = []
         reason: str | None = None
         if metric_contract.requires_entity_scope and not entity_scope:
-            options = metric_contract.entity_scope_options or ["学生", "教职工", "全体在册人员"]
+            options = metric_contract.entity_scope_options or ["student", "faculty", "all_people"]
             localized = [self._localize_scope(option) for option in options]
             if len(localized) >= 3:
                 prompt = f"你想查询{localized[0]}、{localized[1]}，还是{localized[2]}？"
@@ -511,6 +625,8 @@ class QueryPlannerService:
             "student": "学生",
             "faculty": "教职工",
             "all_people": "全体在册人员",
+            "organization": "组织机构",
+            "expert": "来访专家",
         }
         return mapping.get(scope, scope)
 
@@ -522,6 +638,7 @@ class QueryPlannerService:
         candidate_tables: list[str],
         time_scope: ResolvedTimeScopePayload | None,
         entity_scope: str | None,
+        has_specific_filters: bool,
     ) -> list[RankedSQLCandidatePayload]:
         ranked: list[RankedSQLCandidatePayload] = []
         requested_dimensions = {dimension.dimension_id for dimension in dimensions}
@@ -541,6 +658,11 @@ class QueryPlannerService:
                 if isinstance(item, str)
             }
             candidate_entity_scope = self._read_text(metadata, "entity_scope") or None
+            candidate_specific_filters = {
+                str(item)
+                for item in self._read_items(metadata, "specific_filters")
+                if isinstance(item, str)
+            }
             tables = {
                 str(item)
                 for item in self._read_items(candidate, "tables")
@@ -555,6 +677,11 @@ class QueryPlannerService:
             if requested_dimensions and requested_dimensions <= candidate_dimensions:
                 compatibility_score += 0.2
                 selection_reason = "compatible_metric_dimension"
+            elif not requested_dimensions:
+                if candidate_dimensions:
+                    compatibility_score -= 0.35
+                else:
+                    compatibility_score += 0.15
             if requested_tables and requested_tables <= tables:
                 compatibility_score += 0.15
             if requested_time_grain and requested_time_grain in candidate_time_grains:
@@ -563,6 +690,8 @@ class QueryPlannerService:
                     selection_reason = "compatible_metric_dimension_time"
             if entity_scope and candidate_entity_scope and entity_scope == candidate_entity_scope:
                 compatibility_score += 0.05
+            if candidate_specific_filters and not has_specific_filters:
+                compatibility_score -= 0.3
             ranked.append(
                 RankedSQLCandidatePayload(
                     asset_id=self._read_text(candidate, "asset_id"),
@@ -605,3 +734,12 @@ class QueryPlannerService:
             return float(value)
         except (TypeError, ValueError):
             return None
+
+    def _normalize_text(self, value: str) -> str:
+        return re.sub(r"[\s,，。、“”\"'‘’（）()\-_/]+", "", value.strip().lower())
+
+    def _escape_sql_literal(self, value: str) -> str:
+        return value.replace("\\", "\\\\").replace("'", "''")
+
+    def _has_group_cue(self, query_text: str) -> bool:
+        return any(keyword in query_text for keyword in ("按", "分", "各", "每", "维度", "排名", "TOP", "top"))

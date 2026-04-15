@@ -3,7 +3,7 @@ from typing import Any
 from ndea.config import Settings
 from ndea.semantic import DimensionContract, JoinPathContract, MetricContract, TimeSemantics
 from ndea.vector.hybrid import HybridSearchScorer
-from ndea.vector.qdrant_client import QdrantVectorStore, open_qdrant_client
+from ndea.vector.milvus_client import MilvusVectorStore, open_milvus_client
 from ndea.vector.models import SemanticAssetMatch, VectorLocatorPayload
 
 
@@ -12,14 +12,16 @@ class VectorLocatorService:
         self,
         settings: Settings,
         store: Any | None = None,
+        catalog_client: Any | None = None,
     ) -> None:
         self._settings = settings
         self._hybrid_scorer = HybridSearchScorer(settings)
-        self._store = store or QdrantVectorStore(
-            client=open_qdrant_client(settings),
-            collection_name=settings.qdrant_collection,
-            vector_name=settings.qdrant_vector_name,
+        self._store = store or MilvusVectorStore(
+            client=open_milvus_client(settings),
+            collection_name=settings.milvus_collection,
+            vector_name=settings.milvus_vector_name,
         )
+        self._catalog_client = catalog_client or open_milvus_client(settings)
 
     def locate(
         self,
@@ -28,10 +30,10 @@ class VectorLocatorService:
         asset_types: list[str] | None = None,
         limit: int | None = None,
     ) -> VectorLocatorPayload:
-        resolved_limit = max(1, limit or self._settings.qdrant_search_limit)
+        resolved_limit = max(1, limit or self._settings.milvus_search_limit)
         search_limit = resolved_limit
-        if self._settings.qdrant_hybrid_enabled:
-            search_limit = max(resolved_limit, self._settings.qdrant_hybrid_overfetch_limit)
+        if self._settings.milvus_hybrid_enabled:
+            search_limit = max(resolved_limit, self._settings.milvus_hybrid_overfetch_limit)
         hits = self._store.search(
             query_vector=query_vector,
             asset_types=asset_types,
@@ -47,10 +49,26 @@ class VectorLocatorService:
         if matches:
             summary = f"Found {total_matches} semantic matches"
 
-        metric_contracts = self._extract_metric_contracts(matches)
-        dimension_contracts = self._extract_dimension_contracts(matches)
-        join_path_contracts = self._extract_join_path_contracts(matches)
-        time_semantics_catalog = self._extract_time_semantics(matches)
+        metric_contracts = self._merge_contracts(
+            self._extract_metric_contracts(matches),
+            self._load_contract_catalog("metric_contract", "metric_contract", MetricContract, "metric_id"),
+            "metric_id",
+        )
+        dimension_contracts = self._merge_contracts(
+            self._extract_dimension_contracts(matches),
+            self._load_contract_catalog("dimension_contract", "dimension_contract", DimensionContract, "dimension_id"),
+            "dimension_id",
+        )
+        join_path_contracts = self._merge_contracts(
+            self._extract_join_path_contracts(matches),
+            self._load_contract_catalog("join_path", "join_path_contract", JoinPathContract, "join_id"),
+            "join_id",
+        )
+        time_semantics_catalog = self._merge_contracts(
+            self._extract_time_semantics(matches),
+            self._load_contract_catalog("time_semantics", "time_semantics", TimeSemantics, "semantic_id"),
+            "semantic_id",
+        )
 
         return VectorLocatorPayload(
             query_text=query_text,
@@ -83,7 +101,7 @@ class VectorLocatorService:
             score = 0.0
         hybrid_score = None
         keyword_score = None
-        if self._settings.qdrant_hybrid_enabled:
+        if self._settings.milvus_hybrid_enabled:
             lexical_fields = [
                 str(entity.get("title") or ""),
                 str(entity.get("text") or entity.get("content") or ""),
@@ -156,4 +174,42 @@ class VectorLocatorService:
                 continue
             contracts.append(TimeSemantics.model_validate(payload))
         return contracts
+
+    def _load_contract_catalog(
+        self,
+        asset_type: str,
+        metadata_key: str,
+        model_type,
+        key_field: str,
+    ) -> list[Any]:
+        rows = self._catalog_client.query(
+            collection_name=self._settings.milvus_collection,
+            filter=f"asset_type == '{asset_type}'",
+            output_fields=["asset_id", "metadata"],
+        )
+        contracts: list[Any] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            metadata = row.get("metadata")
+            if not isinstance(metadata, dict):
+                continue
+            payload = metadata.get(metadata_key)
+            if not isinstance(payload, dict):
+                continue
+            contract = model_type.model_validate(payload)
+            if getattr(contract, key_field, None):
+                contracts.append(contract)
+        return contracts
+
+    def _merge_contracts(self, primary: list[Any], secondary: list[Any], key_field: str) -> list[Any]:
+        merged: list[Any] = []
+        seen: set[str] = set()
+        for contract in [*primary, *secondary]:
+            key_value = getattr(contract, key_field, None)
+            if not isinstance(key_value, str) or not key_value or key_value in seen:
+                continue
+            seen.add(key_value)
+            merged.append(contract)
+        return merged
 

@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 from ndea.config import Settings
 from ndea.vector.hybrid import HybridSearchScorer
-from ndea.vector.qdrant_client import QdrantVectorStore, open_qdrant_client
+from ndea.vector.milvus_client import MilvusVectorStore, open_milvus_client
 
 
 class GoldenSQLCandidate(BaseModel):
@@ -36,10 +36,10 @@ class SQLRAGService:
     ) -> None:
         self._settings = settings
         self._hybrid_scorer = HybridSearchScorer(settings)
-        self._store = store or QdrantVectorStore(
-            client=open_qdrant_client(settings),
-            collection_name=settings.qdrant_collection,
-            vector_name=settings.qdrant_vector_name,
+        self._store = store or MilvusVectorStore(
+            client=open_milvus_client(settings),
+            collection_name=settings.milvus_collection,
+            vector_name=settings.milvus_vector_name,
             output_fields=[
                 "asset_id",
                 "asset_type",
@@ -58,10 +58,10 @@ class SQLRAGService:
         query_vector: list[float],
         limit: int | None = None,
     ) -> SQLRAGPayload:
-        resolved_limit = max(1, limit or self._settings.qdrant_search_limit)
+        resolved_limit = max(1, limit or self._settings.milvus_search_limit)
         search_limit = resolved_limit
-        if self._settings.qdrant_hybrid_enabled:
-            search_limit = max(resolved_limit, self._settings.qdrant_hybrid_overfetch_limit)
+        if self._settings.milvus_hybrid_enabled:
+            search_limit = max(resolved_limit, self._settings.milvus_hybrid_overfetch_limit)
         hits = self._store.search(
             query_vector=query_vector,
             asset_types=["golden_sql"],
@@ -106,7 +106,7 @@ class SQLRAGService:
             score = 0.0
         hybrid_score = None
         keyword_score = None
-        if self._settings.qdrant_hybrid_enabled:
+        if self._settings.milvus_hybrid_enabled:
             lexical_fields = [
                 str(entity.get("question") or ""),
                 str(entity.get("notes") or ""),

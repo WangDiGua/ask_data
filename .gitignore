@@ -1,6 +1,10 @@
 __pycache__/
 .pytest_cache/
 .venv/
+.pydeps310/
+.tmp/
+.env
+*.log
 *.egg-info/
 *.pyc
 *.pyo
