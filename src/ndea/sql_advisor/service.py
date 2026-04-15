@@ -22,6 +22,16 @@ class VannaStyleSQLAdvisorService:
         plan: QueryPlanPayload,
         query_vector: list[float] | None = None,
     ) -> SQLAdvisoryPayload:
+        if plan.intent_type == "attribute_lookup":
+            return SQLAdvisoryPayload(
+                selected_sql=None,
+                selected_sql_asset_id=None,
+                strategy="attribute_lookup_passthrough",
+                confidence=1.0,
+                examples=[],
+                notes=["Bypassed SQL exemplar selection for identifier attribute lookup"],
+            )
+
         examples = self._examples_from_plan(plan)
         selected_sql = plan.selected_sql
         selected_sql_asset_id = plan.selected_sql_asset_id

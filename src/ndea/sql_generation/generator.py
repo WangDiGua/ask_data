@@ -28,6 +28,9 @@ class SQLGeneratorService:
                 reason="Clarification required before SQL generation",
             )
 
+        if plan.intent_type == "attribute_lookup":
+            return self._generate_attribute_lookup_sql(plan)
+
         if plan.resolved_metric is not None and plan.metric_id is not None:
             return self._generate_structured_metric_sql(plan)
 
@@ -104,6 +107,9 @@ class SQLGeneratorService:
                 reason="Clarification required before SQL generation",
             )
 
+        if plan.intent_type == "attribute_lookup":
+            return self._generate_attribute_lookup_sql(plan, table_override=table)
+
         if plan.intent_type == "metric":
             return SQLGenerationPayload(
                 generated=True,
@@ -134,3 +140,58 @@ class SQLGeneratorService:
             strategy=None,
             reason="Planner needs richer time semantics for trend/comparison SQL generation",
         )
+
+    def _generate_attribute_lookup_sql(
+        self,
+        plan: QueryPlanPayload,
+        table_override: str | None = None,
+    ) -> SQLGenerationPayload:
+        identifier = plan.lookup_identifier
+        attributes = plan.lookup_attributes
+        if identifier is None:
+            return SQLGenerationPayload(
+                generated=False,
+                sql=None,
+                strategy=None,
+                reason="Attribute lookup plan is missing identifier metadata",
+            )
+        if not attributes:
+            return SQLGenerationPayload(
+                generated=False,
+                sql=None,
+                strategy=None,
+                reason="Attribute lookup plan is missing target attributes",
+            )
+
+        table_name = table_override or identifier.table
+        select_parts = []
+        for attribute in attributes:
+            if attribute.table not in {None, "", table_name}:
+                return SQLGenerationPayload(
+                    generated=False,
+                    sql=None,
+                    strategy=None,
+                    reason="Requested attributes span multiple tables and need clarification",
+                )
+            alias = attribute.output_alias or attribute.dimension_id
+            select_parts.append(f"{attribute.expression} AS {alias}")
+
+        where_clauses = [filter_payload.expression for filter_payload in plan.filters]
+        if not where_clauses:
+            where_clauses.append(
+                f"{identifier.expression} = '{self._escape_sql_literal(identifier.value)}'"
+            )
+
+        sql_parts = [f"SELECT DISTINCT {', '.join(select_parts)}", f"FROM {table_name}"]
+        sql_parts.extend(step.join_sql for step in plan.join_plan)
+        sql_parts.append(f"WHERE {' AND '.join(where_clauses)}")
+        sql_parts.append("LIMIT 20")
+        return SQLGenerationPayload(
+            generated=True,
+            sql=" ".join(sql_parts),
+            strategy="attribute_lookup",
+            reason=None,
+        )
+
+    def _escape_sql_literal(self, value: str) -> str:
+        return value.replace("\\", "\\\\").replace("'", "''")

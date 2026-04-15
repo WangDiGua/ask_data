@@ -39,6 +39,10 @@ class ResponseAssemblerService:
         return AssembledResponsePayload(text=text, table=table, chart=chart)
 
     def _build_text(self, execution: dict[str, Any], plan: QueryPlanPayload) -> TextPayload:
+        if plan.intent_type == "attribute_lookup":
+            attribute_text = self._build_attribute_lookup_text(execution, plan)
+            if attribute_text is not None:
+                return attribute_text
         summary = execution.get("summary")
         if isinstance(summary, dict):
             return TextPayload.model_validate(summary)
@@ -100,3 +104,35 @@ class ResponseAssemblerService:
         if isinstance(reason, str):
             return reason
         return None
+
+    def _build_attribute_lookup_text(
+        self,
+        execution: dict[str, Any],
+        plan: QueryPlanPayload,
+    ) -> TextPayload | None:
+        table = execution.get("table")
+        if not isinstance(table, dict):
+            return None
+        rows = table.get("rows")
+        if not isinstance(rows, list) or not rows:
+            return None
+        row = rows[0]
+        if not isinstance(row, dict):
+            return None
+
+        identifier = plan.lookup_identifier
+        if identifier is None:
+            return None
+
+        if len(plan.lookup_attributes) == 1:
+            attribute = plan.lookup_attributes[0]
+            alias = attribute.output_alias or attribute.dimension_id
+            value = row.get(alias)
+            if value is not None:
+                return TextPayload(summary=f"{identifier.label}{identifier.value}的{attribute.name}是{value}")
+
+        details = "；".join(
+            f"{attribute.name}={row.get(attribute.output_alias or attribute.dimension_id)}"
+            for attribute in plan.lookup_attributes
+        )
+        return TextPayload(summary=f"{identifier.label}{identifier.value}的查询结果如下", details=details or None)

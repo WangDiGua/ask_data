@@ -9,7 +9,7 @@ from sse_starlette import EventSourceResponse
 
 from ndea.config import Settings
 from ndea.observability import get_health_service
-from ndea.server import create_mcp
+from ndea.server import create_mcp, create_portal_mcp
 from ndea.tools.query_workflow import get_query_workflow_service
 
 
@@ -77,4 +77,5 @@ def create_http_app(
         return EventSourceResponse(event_generator())
 
     app.mount("/mcp", create_mcp(resolved).http_app(transport="sse"))
+    app.mount("/mcp-portal", create_portal_mcp(resolved).http_app(transport="sse"))
     return app

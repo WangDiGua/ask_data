@@ -2,6 +2,7 @@ from collections.abc import Iterable
 import re
 from typing import Any
 
+from ndea.planning.attribute_lookup import build_attribute_lookup_plan
 from ndea.planning.models import (
     JoinPlanStepPayload,
     QueryPlanPayload,
@@ -32,6 +33,9 @@ class QueryPlannerService:
         request_context: dict[str, object] | None = None,
     ) -> QueryPlanPayload:
         planning_context = self._read_mapping(request_context or {}, "planning_context")
+        attribute_lookup_plan = build_attribute_lookup_plan(query_text)
+        if attribute_lookup_plan is not None:
+            return attribute_lookup_plan
         degraded = False
         degradation_reasons: list[str] = []
         try:

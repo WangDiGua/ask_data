@@ -81,12 +81,11 @@ class FakeHealthService:
 
 
 def test_fastapi_app_exposes_health_workflow_and_stream() -> None:
-    client = TestClient(
-        create_http_app(
-            workflow_service=FakeWorkflowService(),
-            health_service=FakeHealthService(),
-        )
+    app = create_http_app(
+        workflow_service=FakeWorkflowService(),
+        health_service=FakeHealthService(),
     )
+    client = TestClient(app)
 
     liveness = client.get("/health/liveness")
     assert liveness.status_code == 200
@@ -125,3 +124,7 @@ def test_fastapi_app_exposes_health_workflow_and_stream() -> None:
     assert "event: workflow" in body
     assert '"type":"node"' in body
     assert '"type":"final"' in body
+
+    mounted_paths = {route.path for route in app.routes}
+    assert "/mcp" in mounted_paths
+    assert "/mcp-portal" in mounted_paths

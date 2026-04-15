@@ -173,3 +173,41 @@ def test_query_planner_marks_response_degraded_when_retrieval_backends_fail() ->
     assert payload.clarification_required is True
     assert payload.selected_sql is None
 
+
+def test_query_planner_routes_identifier_attribute_lookup_before_semantic_retrieval() -> None:
+    vector_locator = FakeVectorLocatorService({"matches": []})
+    sql_rag = FakeSQLRAGService({"candidates": []})
+    planner = QueryPlannerService(vector_locator=vector_locator, sql_rag=sql_rag)
+
+    payload = planner.plan(
+        query_text="工号是87024的职称和姓名",
+        query_vector=[0.8, 0.1],
+    )
+
+    assert vector_locator.calls == []
+    assert sql_rag.calls == []
+    assert payload.intent_type == "attribute_lookup"
+    assert payload.clarification_required is False
+    assert payload.lookup_identifier is not None
+    assert payload.lookup_identifier.table == "t_bsdt_jzgygcg"
+    assert payload.lookup_identifier.column == "ZGH"
+    assert payload.lookup_identifier.value == "87024"
+    assert [item.name for item in payload.lookup_attributes] == ["姓名", "职称"]
+    assert payload.filters[0].expression == "t_bsdt_jzgygcg.ZGH = '87024'"
+
+
+def test_query_planner_requests_clarification_when_identifier_attributes_span_multiple_tables() -> None:
+    planner = QueryPlannerService(
+        vector_locator=FakeVectorLocatorService({"matches": []}),
+        sql_rag=FakeSQLRAGService({"candidates": []}),
+    )
+
+    payload = planner.plan(
+        query_text="工号87024的所在单位和职称",
+        query_vector=[0.8, 0.1],
+    )
+
+    assert payload.intent_type == "attribute_lookup"
+    assert payload.clarification_required is True
+    assert payload.clarification_reason == "Requested attributes are not available from a single authoritative table"
+

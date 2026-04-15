@@ -5,10 +5,11 @@ import argparse
 from ndea.config import Settings
 from ndea.http import create_http_app
 from ndea.observability import get_health_service
-from ndea.server import create_mcp
+from ndea.server import create_mcp, create_portal_mcp
 
 
 mcp = create_mcp()
+portal_mcp = create_portal_mcp()
 app = mcp
 http_app = create_http_app()
 

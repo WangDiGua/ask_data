@@ -1,4 +1,5 @@
 from ndea.planning import QueryPlanPayload, QueryWorkflowService
+from ndea.planning.models import LookupIdentifierPayload, ResolvedDimensionPayload, ResolvedFilterPayload
 from ndea.sql_generation import SQLGenerationPayload, SQLRepairPayload
 
 
@@ -329,6 +330,92 @@ def test_query_workflow_generates_sql_when_plan_has_no_reusable_candidate() -> N
                 "actor_id": "user-2",
                 "policy": {"allowed_tables": ["student"]},
             },
+        }
+    ]
+
+
+def test_query_workflow_executes_attribute_lookup_plan() -> None:
+    planner = FakeQueryPlannerService(
+        QueryPlanPayload(
+            query_text="工号是87024的职称",
+            intent_type="attribute_lookup",
+            summary="Resolved attribute lookup",
+            clarification_required=False,
+            clarification_reason=None,
+            candidate_tables=["t_bsdt_jzgygcg", "dcemp"],
+            candidate_metrics=[],
+            join_hints=[],
+            selected_sql_asset_id=None,
+            selected_sql=None,
+            filters=[
+                ResolvedFilterPayload(
+                    filter_id="staff_no_lookup",
+                    expression="t_bsdt_jzgygcg.ZGH = '87024'",
+                    source="identifier_lookup",
+                )
+            ],
+            lookup_identifier=LookupIdentifierPayload(
+                identifier_type="staff_no",
+                label="工号",
+                table="t_bsdt_jzgygcg",
+                column="ZGH",
+                expression="t_bsdt_jzgygcg.ZGH",
+                value="87024",
+            ),
+            lookup_attributes=[
+                ResolvedDimensionPayload(
+                    dimension_id="title_name",
+                    name="职称",
+                    expression="t_bsdt_jzgygcg.ZC",
+                    output_alias="title_name",
+                    table="t_bsdt_jzgygcg",
+                )
+            ],
+        )
+    )
+    executor = FakeQueryExecutionService(
+        {
+            "trace_id": "trace-lookup",
+            "request_id": "request-lookup",
+            "database": "wenshu_db",
+            "allowed": True,
+            "sql": "SELECT DISTINCT t_bsdt_jzgygcg.ZC AS title_name FROM t_bsdt_jzgygcg WHERE t_bsdt_jzgygcg.ZGH = '87024' LIMIT 20",
+            "effective_sql": "SELECT DISTINCT t_bsdt_jzgygcg.ZC AS title_name FROM t_bsdt_jzgygcg WHERE t_bsdt_jzgygcg.ZGH = '87024' LIMIT 20",
+            "degraded": False,
+            "error_code": None,
+            "audit_id": "audit-lookup",
+            "policy_summary": {"allowed_tables": ["t_bsdt_jzgygcg"]},
+            "summary": {"summary": "Returned 1 rows from wenshu_db", "details": None},
+            "table": {
+                "columns": ["title_name"],
+                "rows": [{"title_name": "教授"}],
+                "total_rows": 1,
+            },
+        }
+    )
+    workflow = QueryWorkflowService(
+        planner=planner,
+        query_service=executor,
+        trace_id_factory=lambda: "trace-lookup",
+        request_id_factory=lambda: "request-lookup",
+    )
+
+    payload = workflow.run(
+        query_text="工号是87024的职称",
+        query_vector=[0.7, 0.3],
+        database="wenshu_db",
+        execute=True,
+    )
+
+    assert payload.executed is True
+    assert payload.generation is not None
+    assert payload.generation.strategy == "attribute_lookup"
+    assert payload.response_text.summary == "工号87024的职称是教授"
+    assert payload.tool_trace == ["query_planner", "sql_generator", "safe_executor", "response_assembler"]
+    assert executor.calls == [
+        {
+            "database": "wenshu_db",
+            "sql": "SELECT DISTINCT t_bsdt_jzgygcg.ZC AS title_name FROM t_bsdt_jzgygcg WHERE t_bsdt_jzgygcg.ZGH = '87024' LIMIT 20",
         }
     ]
 

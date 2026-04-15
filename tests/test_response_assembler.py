@@ -1,4 +1,5 @@
 from ndea.planning import QueryPlanPayload
+from ndea.planning.models import LookupIdentifierPayload, ResolvedDimensionPayload
 from ndea.response.assembler import ResponseAssemblerService
 
 
@@ -59,3 +60,49 @@ def test_response_assembler_uses_plan_summary_when_execution_is_missing() -> Non
     assert payload.text.summary == "Need more semantic grounding before planning SQL"
     assert payload.table is None
     assert payload.chart is None
+
+
+def test_response_assembler_formats_attribute_lookup_summary() -> None:
+    service = ResponseAssemblerService()
+    plan = QueryPlanPayload(
+        query_text="工号是87024的职称",
+        intent_type="attribute_lookup",
+        summary="Resolved attribute lookup",
+        clarification_required=False,
+        clarification_reason=None,
+        candidate_tables=["t_bsdt_jzgygcg"],
+        candidate_metrics=[],
+        join_hints=[],
+        selected_sql_asset_id=None,
+        selected_sql=None,
+        lookup_identifier=LookupIdentifierPayload(
+            identifier_type="staff_no",
+            label="工号",
+            table="t_bsdt_jzgygcg",
+            column="ZGH",
+            expression="t_bsdt_jzgygcg.ZGH",
+            value="87024",
+        ),
+        lookup_attributes=[
+            ResolvedDimensionPayload(
+                dimension_id="title_name",
+                name="职称",
+                expression="t_bsdt_jzgygcg.ZC",
+                output_alias="title_name",
+                table="t_bsdt_jzgygcg",
+            )
+        ],
+    )
+    execution = {
+        "allowed": True,
+        "summary": {"summary": "Returned 1 rows from wenshu_db", "details": None},
+        "table": {
+            "columns": ["title_name"],
+            "rows": [{"title_name": "教授"}],
+            "total_rows": 1,
+        },
+    }
+
+    payload = service.assemble(plan, execution)
+
+    assert payload.text.summary == "工号87024的职称是教授"

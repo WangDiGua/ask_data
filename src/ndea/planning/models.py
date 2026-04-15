@@ -80,6 +80,17 @@ class QueryPlanPayload(BaseModel):
     confidence: float | None = None
     resolved_metric: ResolvedMetricPayload | None = None
     ranked_sql_candidates: list[RankedSQLCandidatePayload] = Field(default_factory=list)
+    lookup_identifier: "LookupIdentifierPayload | None" = None
+    lookup_attributes: list[ResolvedDimensionPayload] = Field(default_factory=list)
+
+
+class LookupIdentifierPayload(BaseModel):
+    identifier_type: str
+    label: str
+    table: str
+    column: str
+    expression: str
+    value: str
 
 
 class SQLAttemptPayload(BaseModel):
