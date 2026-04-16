@@ -152,6 +152,52 @@ NDEA_MYSQL_DATABASE=campus
 .\.venv\Scripts\fastmcp.exe run src\ndea\main.py:app -t http --host 127.0.0.1 -p 8000
 ```
 
+### 7.4 一键启动
+
+项目根目录新增了两个一键启动脚本：
+
+- `start.ps1`
+- `start.cmd`
+
+Windows 下推荐直接使用：
+
+```powershell
+.\start.cmd
+```
+
+该方式会以前台模式启动 `HTTP / FastAPI` 服务，并把运行日志持续打印在当前终端窗口。
+
+- 默认地址：`http://127.0.0.1:8001`
+- 停止方式：`Ctrl+C`
+
+开发时如果需要热重载：
+
+```powershell
+.\start.ps1 -Reload
+```
+
+如果需要自定义监听地址或端口：
+
+```powershell
+.\start.ps1 -ListenHost 0.0.0.0 -Port 8001
+```
+
+### 7.5 启动模式说明
+
+当前项目可以按三种实际形态启动：
+
+1. `HTTP / FastAPI`
+   - 入口：`ndea.main:http_app`
+   - 适合本地联调、HTTP 接口调试、SSE 流式问数和健康检查
+2. `MCP / stdio`
+   - 入口：`src\ndea\main.py:app`
+   - 适合由 MCP 客户端通过标准输入输出直接拉起
+3. `MCP / HTTP`
+   - 入口：`src\ndea\main.py:app -t http`
+   - 适合通过 HTTP 传输 MCP 能力
+
+其中 `start.ps1` 和 `start.cmd` 启动的是第 `1` 种，也就是最常用的本地前台日志开发模式。
+
 ## 8. HTTP 调用示例
 
 ### 8.1 同步问数
