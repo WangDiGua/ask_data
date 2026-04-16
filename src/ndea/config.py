@@ -1,4 +1,3 @@
-from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,8 +7,6 @@ class Settings(BaseSettings):
     app_name: str = "NDEA"
     env: str = "development"
     log_level: str = "INFO"
-    workflow_runtime: str = "langgraph"
-    enable_legacy_tools: bool = False
     embedding_provider: str = "http"
     milvus_uri: str = "http://8.137.15.201:6333"
     milvus_token: str = ""
@@ -54,67 +51,4 @@ class Settings(BaseSettings):
     mysql_password: str = ""
     mysql_database: str = ""
 
-    @model_validator(mode="before")
-    @classmethod
-    def _map_legacy_qdrant_settings(cls, data):
-        if not isinstance(data, dict):
-            return data
-
-        mappings = {
-            "qdrant_url": "milvus_uri",
-            "qdrant_api_key": "milvus_token",
-            "qdrant_collection": "milvus_collection",
-            "qdrant_vector_name": "milvus_vector_name",
-            "qdrant_search_limit": "milvus_search_limit",
-            "qdrant_hybrid_enabled": "milvus_hybrid_enabled",
-            "qdrant_hybrid_overfetch_limit": "milvus_hybrid_overfetch_limit",
-            "qdrant_hybrid_vector_weight": "milvus_hybrid_vector_weight",
-            "qdrant_hybrid_keyword_weight": "milvus_hybrid_keyword_weight",
-            "qdrant_hybrid_exact_match_boost": "milvus_hybrid_exact_match_boost",
-        }
-        resolved = dict(data)
-        for legacy_key, milvus_key in mappings.items():
-            if milvus_key not in resolved and legacy_key in resolved:
-                resolved[milvus_key] = resolved[legacy_key]
-        return resolved
-
-    @property
-    def qdrant_url(self) -> str:
-        return self.milvus_uri
-
-    @property
-    def qdrant_api_key(self) -> str:
-        return self.milvus_token
-
-    @property
-    def qdrant_collection(self) -> str:
-        return self.milvus_collection
-
-    @property
-    def qdrant_vector_name(self) -> str:
-        return self.milvus_vector_name
-
-    @property
-    def qdrant_search_limit(self) -> int:
-        return self.milvus_search_limit
-
-    @property
-    def qdrant_hybrid_enabled(self) -> bool:
-        return self.milvus_hybrid_enabled
-
-    @property
-    def qdrant_hybrid_overfetch_limit(self) -> int:
-        return self.milvus_hybrid_overfetch_limit
-
-    @property
-    def qdrant_hybrid_vector_weight(self) -> float:
-        return self.milvus_hybrid_vector_weight
-
-    @property
-    def qdrant_hybrid_keyword_weight(self) -> float:
-        return self.milvus_hybrid_keyword_weight
-
-    @property
-    def qdrant_hybrid_exact_match_boost(self) -> float:
-        return self.milvus_hybrid_exact_match_boost
 

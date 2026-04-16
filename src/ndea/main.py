@@ -4,10 +4,9 @@ import argparse
 import warnings
 
 from ndea.config import Settings
-from ndea.http import create_http_app
 from ndea.observability import get_health_service
 from ndea.runtime import configure_runtime, runtime_support_message
-from ndea.server import create_mcp, create_portal_mcp
+from ndea.server import create_mcp
 
 
 configure_runtime()
@@ -17,9 +16,7 @@ if runtime_message:
 
 
 mcp = create_mcp()
-portal_mcp = create_portal_mcp()
 app = mcp
-http_app = create_http_app()
 
 
 def main(argv: list[str] | None = None) -> int:

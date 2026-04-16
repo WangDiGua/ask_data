@@ -1,5 +1,5 @@
 param(
-    [string]$ListenHost = "0.0.0.0",
+    [string]$ListenHost = "127.0.0.1",
     [int]$Port = 8001,
     [switch]$Reload
 )
@@ -10,6 +10,7 @@ $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $repoRoot
 
 $venvPython = Join-Path $repoRoot ".venv\Scripts\python.exe"
+$venvFastMcp = Join-Path $repoRoot ".venv\Scripts\fastmcp.exe"
 $srcPath = Join-Path $repoRoot "src"
 
 if (Test-Path $venvPython) {
@@ -17,6 +18,12 @@ if (Test-Path $venvPython) {
 } else {
     $pythonCommand = Get-Command python -ErrorAction Stop
     $pythonExe = $pythonCommand.Source
+}
+
+if (Test-Path $venvFastMcp) {
+    $fastMcpExe = $venvFastMcp
+} else {
+    $fastMcpExe = $null
 }
 
 if (-not (Test-Path $srcPath)) {
@@ -49,26 +56,33 @@ try {
     Write-Warning "Unable to inspect Python runtime compatibility: $($_.Exception.Message)"
 }
 
-& $pythonExe -c "import uvicorn, fastapi, ndea" *> $null
+& $pythonExe -c "import fastmcp, ndea" *> $null
 if ($LASTEXITCODE -ne 0) {
-    throw "Runtime dependencies are missing in .venv. Run: .\.venv\Scripts\python.exe -m pip install -e .[dev]"
+    throw ".venv 中缺少运行依赖。请执行：.\.venv\Scripts\python.exe -m pip install -e .[dev]"
 }
 
-$uvicornArgs = @(
-    "-m", "uvicorn",
-    "ndea.main:http_app",
+$fastMcpArgs = @(
+    "run",
+    "src\ndea\main.py:app",
+    "--transport", "http",
     "--host", $ListenHost,
-    "--port", $Port.ToString()
+    "--port", $Port.ToString(),
+    "--no-banner"
 )
 
 if ($Reload) {
-    $uvicornArgs += "--reload"
+    $fastMcpArgs += "--reload"
 }
 
-Write-Host "[NDEA] Repo   : $repoRoot"
-Write-Host "[NDEA] Python : $pythonExe"
-Write-Host "[NDEA] URL    : http://127.0.0.1:$Port"
-Write-Host "[NDEA] Logs stream in this terminal. Press Ctrl+C to stop."
+Write-Host "[NDEA] 项目目录 : $repoRoot"
+Write-Host "[NDEA] Python   : $pythonExe"
+Write-Host "[NDEA] 传输方式 : MCP over HTTP"
+Write-Host "[NDEA] 服务地址 : http://$ListenHost`:$Port/mcp/"
+Write-Host "[NDEA] 日志会持续输出在当前终端，按 Ctrl+C 停止。"
 
-& $pythonExe @uvicornArgs
+if ($fastMcpExe) {
+    & $fastMcpExe @fastMcpArgs
+} else {
+    & $pythonExe -m fastmcp @fastMcpArgs
+}
 exit $LASTEXITCODE

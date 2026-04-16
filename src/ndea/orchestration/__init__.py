@@ -1,3 +1,3 @@
-from ndea.orchestration.langgraph_workflow import LangGraphQueryWorkflowService
+from ndea.orchestration.query_graph_v2 import QueryGraphV2
 
-__all__ = ["LangGraphQueryWorkflowService"]
+__all__ = ["QueryGraphV2"]

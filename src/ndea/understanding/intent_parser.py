@@ -77,6 +77,19 @@ class IntentParser:
             filters.append("在岗")
             campus_terms.append("active_faculty")
 
+        if "中共预备党员" in text or "预备党员" in text:
+            filters.append("political_status:中共预备党员")
+            campus_terms.append("political_status")
+        elif "中共党员" in text:
+            filters.append("political_status:中共党员")
+            campus_terms.append("political_status")
+        elif "党员" in text:
+            filters.append("political_status:中共党员")
+            campus_terms.append("political_status")
+        if "共青团员" in text or "团员" in text:
+            filters.append("political_status:共青团员")
+            campus_terms.append("political_status")
+
         if any(token in text for token in ("出访", "出国", "因公出国")):
             intent_type = "detail"
             answer_mode = "detail"
@@ -122,6 +135,8 @@ class IntentParser:
             confidence += 0.15
         if dimensions:
             confidence += 0.1
+        if filters:
+            confidence += 0.05
         if time_scope is not None:
             confidence += 0.1
         if any(term in campus_terms for term in ("teacher_outbound", "student_outbound", "visiting_expert")):
@@ -134,7 +149,7 @@ class IntentParser:
             entity_scope=entity_scope,
             metric=metric,
             dimensions=dimensions,
-            filters=filters,
+            filters=list(dict.fromkeys(filters)),
             identifiers=identifiers,
             time_scope=time_scope,
             sort=sort,

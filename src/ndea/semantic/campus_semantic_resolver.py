@@ -11,6 +11,12 @@ IDENTIFIER_FIELD_BY_TABLE: dict[str, dict[str, str]] = {
     "t_bsdt_xsygcg": {"学号": "student_no"},
 }
 
+POLITICAL_STATUS_ALIASES: dict[str, str] = {
+    "中共党员": "中共党员",
+    "中共预备党员": "中共预备党员",
+    "共青团员": "共青团员",
+}
+
 
 class CampusSemanticResolver:
     def resolve(self, ir: QueryIR) -> SemanticHint:
@@ -118,8 +124,17 @@ class CampusSemanticResolver:
         for item in filters:
             if item == "在校" and table.table == "dcstu":
                 resolved.append("dcstu.SFZX = '是'")
+                continue
             if item == "在岗" and table.table == "dcemp":
                 resolved.append("dcemp.RYZTMC = '在岗'")
+                continue
+            if item.startswith("political_status:"):
+                value = item.split(":", 1)[1]
+                field = self._field_by_id(table, "political_status_name")
+                canonical_value = POLITICAL_STATUS_ALIASES.get(value)
+                if field is not None and canonical_value is not None:
+                    escaped = canonical_value.replace("'", "''")
+                    resolved.append(f"{field.expression} = '{escaped}'")
         return resolved
 
     def _identifier_filters(self, table: CoreTableDefinition, identifiers: list[dict[str, str]]) -> list[str]:
@@ -148,6 +163,8 @@ class CampusSemanticResolver:
         if dimensions:
             confidence += 0.05
         if ir.identifiers:
+            confidence += 0.05
+        if any(item.startswith("political_status:") for item in ir.filters):
             confidence += 0.05
         if ir.ambiguities:
             confidence -= 0.1

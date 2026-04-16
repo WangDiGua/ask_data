@@ -4,7 +4,6 @@ from ndea.interaction import InteractionService
 from ndea.learning import MilvusLearningSync, MySQLLearningStore
 from ndea.metadata.models import ColumnSchema, TableSchemaDetail, TableSchemaSummary
 from ndea.planning.candidate_plan_builder import CandidatePlanBuilder
-from ndea.portal.service import PortalQueryService
 from ndea.query_v2 import (
     ClarificationPayload,
     InteractionResult,
@@ -14,7 +13,7 @@ from ndea.query_v2 import (
     QueryResponseV2,
     SQLCandidate,
 )
-from ndea.protocol import TablePayload, TextPayload
+from ndea.protocol import TextPayload
 from ndea.ranking import CandidateRanker
 from ndea.resolution import SchemaResolver
 from ndea.semantic.campus_semantic_resolver import CampusSemanticResolver
@@ -85,6 +84,15 @@ def test_intent_parser_extracts_identifier_and_record_term() -> None:
     assert "teacher_outbound" in payload.campus_terms
 
 
+def test_intent_parser_recognizes_student_party_member_filter() -> None:
+    payload = IntentParser().parse("统计中共党员学生人数")
+
+    assert payload.intent_type == "metric"
+    assert payload.entity_scope == "student"
+    assert payload.metric == "count"
+    assert "political_status:中共党员" in payload.filters
+
+
 def test_campus_semantic_resolver_maps_student_scope() -> None:
     ir = QueryIR(
         intent_type="metric",
@@ -101,6 +109,22 @@ def test_campus_semantic_resolver_maps_student_scope() -> None:
     assert payload.base_table == "dcstu"
     assert "dcstu" in payload.candidate_tables
     assert payload.filters[-1] == "dcstu.SFZX = '是'"
+
+
+def test_campus_semantic_resolver_maps_student_party_member_filter() -> None:
+    ir = QueryIR(
+        intent_type="metric",
+        entity_scope="student",
+        metric="count",
+        filters=["political_status:中共党员"],
+        answer_mode="aggregate",
+        confidence=0.8,
+    )
+
+    payload = CampusSemanticResolver().resolve(ir)
+
+    assert payload.base_table == "dcstu"
+    assert "dcstu.ZZMMMC = '中共党员'" in payload.filters
 
 
 def test_campus_semantic_resolver_maps_teacher_outbound_record() -> None:
@@ -262,39 +286,6 @@ def test_interaction_service_resolves_reference_from_recent_identifier() -> None
 
     assert payload.references_resolved is True
     assert payload.rewritten_query_text == "工号10001 出访记录"
-
-
-def test_portal_service_skips_visualization_for_detail_results() -> None:
-    response = QueryResponseV2(
-        session_id="session-3",
-        interpretation=QueryInterpretationPayload(
-            interaction=InteractionResult(
-                query_text="列出教师名单",
-                normalized_query_text="列出教师名单",
-                rewritten_query_text="列出教师名单",
-            ),
-            ir=QueryIR(intent_type="detail", entity_scope="faculty", answer_mode="detail", confidence=0.9),
-        ),
-        answer=TextPayload(summary="已返回教师名单"),
-        table=TablePayload(
-            columns=["staff_no", "name", "org_name", "score"],
-            rows=[
-                {"staff_no": "10001", "name": "张三", "org_name": "计算机学院", "score": None},
-                {"staff_no": "10002", "name": "李四", "org_name": "外国语学院", "score": None},
-            ],
-            total_rows=2,
-        ),
-        sql="SELECT dcemp.XGH AS staff_no FROM dcemp",
-        audit={},
-        confidence=0.9,
-        clarification=ClarificationPayload(required=False),
-        executed=True,
-    )
-
-    service = PortalQueryService(query_service=type("StaticService", (), {"run": lambda self, request: response})())
-    payload = service.query("列出教师名单", database="campus")
-
-    assert payload.visualization is None
 
 
 def test_learning_store_persists_multiple_learning_tables() -> None:

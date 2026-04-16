@@ -31,7 +31,7 @@ def test_structured_logger_audit_sink_writes_json_event() -> None:
             final_status="succeeded",
             error_code=None,
             latency_ms=120,
-            dependency_status={"mysql": "healthy", "qdrant": "healthy"},
+            dependency_status={"mysql": "healthy", "milvus": "healthy"},
         )
     )
 
@@ -51,7 +51,7 @@ def test_health_service_marks_readiness_false_when_required_dependency_is_down()
                 details="offline",
             ),
             lambda: DependencyHealth(
-                name="qdrant",
+                name="milvus",
                 healthy=True,
                 required=True,
                 details="ok",
@@ -67,7 +67,7 @@ def test_health_service_marks_readiness_false_when_required_dependency_is_down()
     assert report.dependencies[0].details == "offline"
 
 
-def test_health_service_marks_readiness_false_when_qdrant_collection_is_missing() -> None:
+def test_health_service_marks_readiness_false_when_milvus_collection_is_missing() -> None:
     service = HealthService(
         dependency_checkers=[
             lambda: DependencyHealth(
@@ -77,7 +77,7 @@ def test_health_service_marks_readiness_false_when_qdrant_collection_is_missing(
                 details="ok",
             ),
             lambda: DependencyHealth(
-                name="qdrant",
+                name="milvus",
                 healthy=False,
                 required=True,
                 details="collection semantic_assets not found",
@@ -88,16 +88,16 @@ def test_health_service_marks_readiness_false_when_qdrant_collection_is_missing(
     report = service.readiness()
 
     assert report.readiness is False
-    assert report.dependencies[1].name == "qdrant"
+    assert report.dependencies[1].name == "milvus"
     assert report.dependencies[1].details == "collection semantic_assets not found"
 
 
-def test_health_service_uses_qdrant_collection_existence_for_readiness(monkeypatch) -> None:
+def test_health_service_uses_milvus_collection_existence_for_readiness(monkeypatch) -> None:
     class FakeConnection:
         def close(self) -> None:
             return None
 
-    class FakeQdrantClient:
+    class FakeMilvusClient:
         def collection_exists(self, collection_name: str) -> bool:
             assert collection_name == "semantic_assets"
             return False
@@ -105,12 +105,12 @@ def test_health_service_uses_qdrant_collection_existence_for_readiness(monkeypat
         def close(self) -> None:
             return None
 
-    monkeypatch.setattr("ndea.observability.health.open_mysql_connection", lambda settings: FakeConnection())
-    monkeypatch.setattr("ndea.observability.health.open_qdrant_client", lambda settings: FakeQdrantClient())
+    monkeypatch.setattr("ndea.metadata.mysql_client.open_mysql_connection", lambda settings: FakeConnection())
+    monkeypatch.setattr("ndea.vector.milvus_client.open_milvus_client", lambda settings: FakeMilvusClient())
 
-    report = HealthService(Settings()).readiness()
+    report = HealthService(Settings(_env_file=None)).readiness()
 
     assert report.readiness is False
-    assert report.dependencies[1].name == "qdrant"
+    assert report.dependencies[1].name == "milvus"
     assert report.dependencies[1].healthy is False
     assert report.dependencies[1].details == "collection semantic_assets not found"
