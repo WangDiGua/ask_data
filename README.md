@@ -1,306 +1,261 @@
-# NDEA 问数 Agent
+# NDEA
 
-NDEA（`Nexus Data Expert Agent`）是一个面向高校复杂问数场景的智能数据问答服务。它运行在 Nexus 门户体系之上，对外同时提供 `MCP` 和 `HTTP/SSE` 两套入口，负责把自然语言问题转成安全、可控、可追踪的结构化查询流程。
+NDEA (`Nexus Data Expert Agent`) 是一套面向校园问数场景的服务端系统。当前版本已经完成 v2 主链路重构，核心方向是：
 
-当前项目的目标不是做一个泛化聊天机器人，而是做一个面向校园业务语义的“高准确率问数引擎”：
+- 校园语义解析优先
+- 知识库不足时由 schema 解析兜底
+- 多候选 SQL 生成、验证和重排
+- 学习闭环落库到 `ndea_learning`
+- 同时提供 `HTTP`、`MCP`、`Portal` 三种入口
 
-- 理解高校业务口径、别名和术语
-- 结合语义资产与黄金 SQL 做检索增强
-- 通过 LangGraph 编排完成规划、SQL 建议、执行、修复和响应组装
-- 通过 SQLGuard、权限层、Explain 检查和审计日志保证生产安全
+## 技术栈
 
-## 1. 技术栈
+- 编排：`LangGraph`
+- 协议：`FastMCP`
+- HTTP：`FastAPI + SSE`
+- 向量检索：`Milvus`
+- 数据库：`MySQL`
+- SQL 校验：`SQLGlot`
+- 配置：`Pydantic Settings`
+- 可选 NL2SQL：`LlamaIndex`
+- 可选观测：`Langfuse`
 
-- 编排层：`LangGraph`
-- 协议层：`FastMCP`
-- 服务层：`FastAPI + SSE`
-- 向量检索：`Qdrant`
-- 数据连接：`SQLAlchemy + mysql-connector-python`
-- SQL 安全：`sqlglot`
-- 配置与模型：`Pydantic / pydantic-settings`
+## 运行时要求
 
-## 2. 当前能力
+- Python：`3.11` 到 `3.13`
+- 不建议使用 `Python 3.14`
+  - 当前上游 `langchain_core`、`pymilvus` 仍可能出现兼容性告警
+  - 代码里已经做了运行时降噪，但生产环境仍建议回到 `3.11-3.13`
 
-项目已经具备以下主链能力：
+## 安装
 
-- 语义检索：检索指标合同、维度合同、Join 路径、时间语义、黄金 SQL
-- 复杂问数规划：识别指标、维度、过滤、时间范围、Join 计划、澄清问题
-- SQL 建议：基于 exemplar / golden SQL 的 Vanna-style SQL advisor
-- 安全执行：只读校验、权限控制、Explain 成本检查、结果行数限制
-- 修复回路：单次 bounded retry，避免简单错误直接失败
-- 响应输出：文本、表格、图表建议
-- 可观测性：健康检查、结构化审计事件、依赖状态回传
-
-## 3. 目录结构
-
-```text
-ask_data/
-├─ src/ndea/
-│  ├─ context/           # 请求上下文、身份与策略上下文
-│  ├─ http/              # FastAPI + SSE 服务入口
-│  ├─ metadata/          # MySQL 元数据与 SQLAlchemy 连接层
-│  ├─ observability/     # 健康检查、审计事件
-│  ├─ orchestration/     # LangGraph 工作流编排
-│  ├─ planning/          # 复杂问数规划
-│  ├─ response/          # 响应组装
-│  ├─ security/          # SQLGuard、权限层、安全执行
-│  ├─ semantic/          # 指标合同、维度合同、Join 合同、时间语义
-│  ├─ sql_advisor/       # Vanna-style SQL advisor
-│  ├─ sql_generation/    # SQL 生成与修复
-│  ├─ tools/             # MCP 工具入口
-│  └─ vector/            # Qdrant 检索与混合重排
-├─ tests/                # 单元测试、集成测试、评测夹具
-├─ docs/                 # 设计与实施文档
-├─ NDEA_MASTER_CONTROL.md
-└─ NDEA_PROGRESS_LEDGER.md
-```
-
-## 4. 环境要求
-
-- Python：`>= 3.14`
-- MySQL：用于元数据探查和安全 SQL 执行
-- Qdrant：用于语义资产与黄金 SQL 检索
-
-## 5. 安装
-
-在 Windows PowerShell 下：
+Windows PowerShell:
 
 ```powershell
-py -3.14 -m venv .venv
+py -3.13 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -U pip
 python -m pip install -e .[dev]
 ```
 
-## 6. 配置
-
-项目通过根目录 `.env` 读取配置，示例见 [.env.example](.env.example)。
-
-当前默认向量库已经切到 `Qdrant`：
-
-```env
-NDEA_QDRANT_URL=http://8.137.15.201:6333
-NDEA_QDRANT_COLLECTION=semantic_assets
-NDEA_QDRANT_VECTOR_NAME=embedding
-```
-
-常用配置项说明：
-
-- `NDEA_WORKFLOW_RUNTIME`
-  - 默认 `langgraph`
-- `NDEA_QDRANT_URL`
-  - Qdrant 服务地址
-- `NDEA_QDRANT_COLLECTION`
-  - 语义资产集合名，默认 `semantic_assets`
-- `NDEA_ENABLE_QUERY_EXECUTION`
-  - 是否启用真实 SQL 执行
-- `NDEA_ENABLE_SEMANTIC_RETRIEVAL`
-  - 是否启用语义检索
-- `NDEA_MYSQL_CONNECTION_BACKEND`
-  - 默认 `sqlalchemy`
-
-MySQL 最低需要配置：
-
-```env
-NDEA_MYSQL_HOST=127.0.0.1
-NDEA_MYSQL_PORT=3306
-NDEA_MYSQL_USER=root
-NDEA_MYSQL_PASSWORD=
-NDEA_MYSQL_DATABASE=campus
-```
-
-## 7. 启动方式
-
-### 7.1 健康检查
+如果你要启用可选能力：
 
 ```powershell
-.\.venv\Scripts\python.exe -m ndea.main --check liveness
-.\.venv\Scripts\python.exe -m ndea.main --check readiness
+python -m pip install -e .[dev,nl2sql,observability]
 ```
 
-说明：
+## 环境变量
 
-- `liveness` 只检查服务自身是否可启动
-- `readiness` 会检查依赖状态
-- 当前版本下，如果 `Qdrant` 可达但 `semantic_assets` 集合不存在，`readiness` 会判定为不就绪
+示例见 [.env.example](.env.example)。
 
-### 7.2 启动 HTTP 服务
+关键配置：
 
-```powershell
-.\.venv\Scripts\uvicorn.exe ndea.main:http_app --host 0.0.0.0 --port 8000
-```
+- `NDEA_MYSQL_HOST` / `NDEA_MYSQL_PORT` / `NDEA_MYSQL_USER` / `NDEA_MYSQL_PASSWORD`
+- `NDEA_MYSQL_DATABASE`
+  - 业务查询库，例如 `wenshu_db`
+- `NDEA_LEARNING_MYSQL_DATABASE`
+  - 学习闭环库，默认 `ndea_learning`
+- `NDEA_MILVUS_URI`
+- `NDEA_MILVUS_COLLECTION`
+  - 主语义资产集合，默认 `semantic_assets`
+- `NDEA_MILVUS_COLLECTION_SQL_CASES`
+- `NDEA_MILVUS_COLLECTION_QUERY_MEMORY`
+- `NDEA_EMBEDDING_BASE_URL`
+- `NDEA_EMBEDDING_MODEL`
+- `NDEA_NL2SQL_ENGINE`
+  - 默认 `llamaindex`
+- `NDEA_LLAMAINDEX_ENGINE_FACTORY`
+  - 形如 `package.module:factory`
+- `NDEA_LANGFUSE_PUBLIC_KEY`
+- `NDEA_LANGFUSE_SECRET_KEY`
+- `NDEA_LANGFUSE_HOST`
+- `NDEA_ENABLE_LEGACY_TOOLS`
+  - 默认 `false`
 
-启动后可用入口：
+## 一键启动
 
-- `GET /health/liveness`
-- `GET /health/readiness`
-- `POST /api/query-workflow`
-- `POST /api/query-workflow/stream`
-- `POST/GET /mcp/...`
-
-### 7.3 启动 MCP 服务
-
-如果你希望直接以 FastMCP 方式运行：
-
-```powershell
-.\.venv\Scripts\fastmcp.exe run src\ndea\main.py:app
-```
-
-如果需要 HTTP 模式：
-
-```powershell
-.\.venv\Scripts\fastmcp.exe run src\ndea\main.py:app -t http --host 127.0.0.1 -p 8000
-```
-
-### 7.4 一键启动
-
-项目根目录新增了两个一键启动脚本：
+项目根目录提供：
 
 - `start.ps1`
 - `start.cmd`
 
-Windows 下推荐直接使用：
+最常用方式：
 
 ```powershell
 .\start.cmd
 ```
 
-该方式会以前台模式启动 `HTTP / FastAPI` 服务，并把运行日志持续打印在当前终端窗口。
+特点：
 
+- 以前台方式启动
+- 日志持续打印在当前终端
 - 默认地址：`http://127.0.0.1:8001`
 - 停止方式：`Ctrl+C`
 
-开发时如果需要热重载：
+热重载：
 
 ```powershell
 .\start.ps1 -Reload
 ```
 
-如果需要自定义监听地址或端口：
+自定义监听地址或端口：
 
 ```powershell
 .\start.ps1 -ListenHost 0.0.0.0 -Port 8001
 ```
 
-### 7.5 启动模式说明
+## 启动模式
 
-当前项目可以按三种实际形态启动：
+### HTTP / FastAPI
 
-1. `HTTP / FastAPI`
-   - 入口：`ndea.main:http_app`
-   - 适合本地联调、HTTP 接口调试、SSE 流式问数和健康检查
-2. `MCP / stdio`
-   - 入口：`src\ndea\main.py:app`
-   - 适合由 MCP 客户端通过标准输入输出直接拉起
-3. `MCP / HTTP`
-   - 入口：`src\ndea\main.py:app -t http`
-   - 适合通过 HTTP 传输 MCP 能力
+```powershell
+.\.venv\Scripts\uvicorn.exe ndea.main:http_app --host 0.0.0.0 --port 8000
+```
 
-其中 `start.ps1` 和 `start.cmd` 启动的是第 `1` 种，也就是最常用的本地前台日志开发模式。
+主要接口：
 
-## 8. HTTP 调用示例
+- `GET /health/liveness`
+- `GET /health/readiness`
+- `POST /api/v2/query`
+- `POST /api/v2/query/stream`
 
-### 8.1 同步问数
+### MCP / stdio
+
+```powershell
+.\.venv\Scripts\fastmcp.exe run src\ndea\main.py:app
+```
+
+### MCP / HTTP
+
+```powershell
+.\.venv\Scripts\fastmcp.exe run src\ndea\main.py:app -t http --host 127.0.0.1 -p 8000
+```
+
+## v2 API
+
+### 同步查询
 
 ```json
-POST /api/query-workflow
+POST /api/v2/query
 {
-  "query_text": "按学院统计 2024 学年在校生人数",
-  "query_vector": [0.1, 0.2, 0.3],
-  "database": "campus",
-  "execute": true,
+  "query_text": "按学院统计 2024 学年在校学生人数",
+  "database": "wenshu_db",
   "request_context": {
     "trace_id": "trace-1",
-    "request_id": "request-1",
-    "actor_id": "user-1",
-    "policy": {
-      "allowed_tables": ["student", "department"]
-    }
+    "recent_user_messages": ["刚才那个口径"]
+  },
+  "policy_context": {},
+  "options": {
+    "debug": true,
+    "max_rows": 100
   }
 }
 ```
 
-### 8.2 流式问数
+说明：
+
+- v2 不再接收 `query_vector`
+- embedding 统一由服务端生成
+
+### 流式查询
 
 ```text
-POST /api/query-workflow/stream
+POST /api/v2/query/stream
 ```
 
-返回为 SSE 事件流，事件名统一为 `workflow`，内容会按节点返回：
+SSE 事件按节点输出，常见事件名：
 
-- `planner`
-- `advisor`
-- `generator`
-- `executor`
-- `repair`
+- `interaction`
+- `intent_parse`
+- `semantic_resolve`
+- `schema_resolve`
+- `build_plan_candidates`
+- `generate_sql_candidates`
+- `verify_candidates`
+- `rank_candidates`
+- `confidence_gate`
+- `execute`
+- `respond`
+- `learn`
 - `final`
 
-## 9. MCP 工具
+## MCP 工具
 
-当前已注册的主要 MCP 工具包括：
+默认注册：
 
-- `system_status`
-- `inspect_table_schema`
+- `ask_data_query`
+- `mcp_query_v2`
 - `execute_guarded_query`
-- `mcp_vector_locator`
-- `mcp_sql_rag_engine`
-- `mcp_query_planner`
-- `mcp_query_workflow`
+- `inspect_table_schema`
+- `system_status`
 
-## 10. Qdrant 使用说明
+legacy 工具默认不注册；只有 `NDEA_ENABLE_LEGACY_TOOLS=true` 时才会暴露，并且响应里会显式标注 `legacy=true`。
 
-当前代码已经完成 `Milvus -> Qdrant` 切换，但要让语义检索真正可用，还需要满足两个条件：
+## 目录说明
 
-1. Qdrant 中存在目标集合，例如 `semantic_assets`
-2. 集合里已经导入语义资产
+当前主要目录：
 
-资产至少应包含：
+- `src/ndea/http`
+- `src/ndea/orchestration`
+- `src/ndea/services`
+- `src/ndea/interaction`
+- `src/ndea/understanding`
+- `src/ndea/semantic`
+- `src/ndea/resolution`
+- `src/ndea/generation`
+- `src/ndea/verification`
+- `src/ndea/ranking`
+- `src/ndea/execution`
+- `src/ndea/learning`
+- `src/ndea/query_v2`
+- `src/ndea/tools`
+- `tests`
 
-- 指标合同 `metric_contract`
-- 维度合同 `dimension_contract`
-- Join 路径 `join_path`
-- 时间语义 `time_semantics`
-- 黄金 SQL `golden_sql`
+## 学习闭环
 
-如果 Qdrant 服务可达但集合为空，系统虽然能启动，但检索相关链路无法真正发挥效果。
+学习数据不会写回业务库，而是落到独立学习库 `ndea_learning`。
 
-## 11. 测试
+当前已使用的核心表包括：
 
-运行全量测试：
+- `query_session`
+- `interaction_turn`
+- `ir_snapshot`
+- `plan_candidate`
+- `sql_candidate`
+- `execution_result`
+- `feedback_event`
+- `promotion_queue`
+- `alias_memory`
+- `value_synonym_memory`
+- `clarification_memory`
+- `sql_case_memory`
+
+Milvus 负责可检索资产，不负责学习事实主存储。
+
+## 测试
+
+运行主要测试：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-项目当前包含：
+当前项目内已覆盖：
 
-- 单元测试
-- 工作流集成测试
-- 复杂问数测试
-- 离线评测夹具
-- Live smoke 测试（环境变量控制）
+- v2 组件测试
+- v2 集成测试
+- HTTP 接口测试
+- Portal 查询服务测试
+- MCP 工具测试
+- 运行时与 registry 回归测试
 
-## 12. 开发建议
+## 当前状态
 
-如果你要继续增强问数准确率，优先级建议如下：
+当前代码已经以 v2 链路为主：
 
-1. 建好 Qdrant 中的语义资产集合并导入真实高校业务资产
-2. 接入真实 embedding 流程
-3. 扩展时间趋势、同比环比、drill-down 等复杂分析能力
-4. 补齐 staging 环境的真实联调与回归数据集
+- 主 API：`/api/v2/query`
+- 主工作流：`QueryGraphV2`
+- 主学习存储：`ndea_learning`
+- 主向量库：`Milvus`
 
-## 13. 当前状态说明
-
-这个仓库已经不是原型骨架，而是一套可运行的高校问数 Agent 基线系统。  
-它已经具备完整主链，但是否能在真实高校场景里达到高准确率，仍然高度依赖：
-
-- Qdrant 中的语义资产质量
-- 黄金 SQL 质量
-- 权限策略配置
-- MySQL / Qdrant 实际数据环境
-
-## 14. 相关文档
-
-- [NDEA_MASTER_CONTROL.md](NDEA_MASTER_CONTROL.md)
-- [NDEA_PROGRESS_LEDGER.md](NDEA_PROGRESS_LEDGER.md)
-
+仍然保留 legacy 模块文件用于迁移期对照，但不再作为默认生产主路径。

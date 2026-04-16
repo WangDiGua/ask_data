@@ -50,3 +50,5 @@ def test_mcp_query_workflow_uses_injected_service(monkeypatch) -> None:
     assert payload["executed"] is True
     assert payload["database"] == "campus"
     assert payload["request_context"] == {"trace_id": "trace-1", "request_id": "request-1", "actor_id": "user-9"}
+    assert payload["legacy"] is True
+    assert "Legacy workflow tool" in payload["legacy_note"]

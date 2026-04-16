@@ -4,9 +4,9 @@ from collections.abc import Mapping
 from typing import Any
 
 from pydantic import BaseModel
-from pymilvus import MilvusClient
 
 from ndea.config import Settings
+from ndea.runtime import configure_runtime
 
 
 class MilvusConnectionInfo(BaseModel):
@@ -23,7 +23,10 @@ def build_milvus_connection_info(settings: Settings) -> MilvusConnectionInfo:
     )
 
 
-def open_milvus_client(settings: Settings) -> MilvusClient:
+def open_milvus_client(settings: Settings) -> Any:
+    configure_runtime()
+    from pymilvus import MilvusClient
+
     info = build_milvus_connection_info(settings)
     return MilvusClient(
         uri=info.uri,

@@ -1,91 +1,93 @@
-from ndea.planning.models import QueryPlanPayload, QueryWorkflowPayload
 from ndea.portal.service import PortalQueryService
+from ndea.query_v2 import (
+    ClarificationPayload,
+    InteractionResult,
+    PlanCandidate,
+    QueryIR,
+    QueryInterpretationPayload,
+    QueryResponseV2,
+)
 from ndea.protocol import TablePayload, TextPayload
 
 
-class FakeWorkflowService:
-    def __init__(self, payload):
-        self.payload = payload
+class StaticQueryService:
+    def __init__(self, payload: QueryResponseV2) -> None:
+        self._payload = payload
 
-    def run(
-        self,
-        query_text: str,
-        query_vector: list[float],
-        database: str | None = None,
-        execute: bool = False,
-        request_context: dict[str, object] | None = None,
-        policy_context: dict[str, object] | None = None,
-    ):
-        return self.payload
+    def run(self, request):
+        return self._payload
 
 
-def build_service(payload: QueryWorkflowPayload) -> PortalQueryService:
-    return PortalQueryService(
-        workflow_service=FakeWorkflowService(payload),
-        embedder=lambda base_url, model, texts: [[0.1, 0.2]],
-    )
-
-
-def test_ranking_query_prefers_horizontal_bar() -> None:
-    payload = QueryWorkflowPayload(
-        trace_id="trace-1",
-        request_id="request-1",
-        query_text="在校学生人数最多的前10个学院",
-        database="wenshu_db",
+def build_payload(query_text: str, rows: list[dict[str, object]], intent_type: str = "metric") -> QueryResponseV2:
+    return QueryResponseV2(
+        session_id="session-1",
+        interpretation=QueryInterpretationPayload(
+            interaction=InteractionResult(
+                query_text=query_text,
+                normalized_query_text=query_text,
+                rewritten_query_text=query_text,
+            ),
+            ir=QueryIR(intent_type=intent_type, metric="count", answer_mode="aggregate", confidence=0.8),
+            selected_plan=PlanCandidate(
+                candidate_id="plan-1",
+                intent_type=intent_type,
+                answer_mode="aggregate",
+                source="semantic-first",
+                base_table="dcstu",
+                candidate_tables=["dcstu"],
+                confidence=0.9,
+            ),
+        ),
+        answer=TextPayload(summary="ok"),
+        table=TablePayload(columns=list(rows[0].keys()), rows=rows, total_rows=len(rows)),
+        sql="SELECT 1",
+        audit={},
+        confidence=0.9,
+        clarification=ClarificationPayload(required=False),
         executed=True,
-        plan=QueryPlanPayload(
-            query_text="在校学生人数最多的前10个学院",
-            intent_type="ranking",
-            summary="按在校学生人数排序的学院前十名。",
-            clarification_required=False,
-            confidence=0.91,
-        ),
-        response_text=TextPayload(summary="按在校学生人数排序的学院前十名。"),
-        response_table=TablePayload(
-            columns=["college_name", "total"],
-            rows=[
-                {"college_name": "烟台研究院", "total": 3009},
-                {"college_name": "信息与电气工程学院", "total": 2645},
-                {"college_name": "工学院", "total": 2598},
-            ],
-            total_rows=3,
-        ),
     )
 
-    result = build_service(payload).query("在校学生人数最多的前10个学院", database="wenshu_db")
 
-    assert result.visualization is not None
-    assert result.visualization["chart"]["kind"] == "bar-horizontal"
-
-
-def test_cross_dimension_query_uses_heatmap() -> None:
-    payload = QueryWorkflowPayload(
-        trace_id="trace-2",
-        request_id="request-2",
-        query_text="按学院和政治面貌统计在校学生人数",
-        database="wenshu_db",
-        executed=True,
-        plan=QueryPlanPayload(
-            query_text="按学院和政治面貌统计在校学生人数",
-            intent_type="metric",
-            summary="按学院和政治面貌统计在校学生人数。",
-            clarification_required=False,
-            confidence=0.93,
-        ),
-        response_text=TextPayload(summary="按学院和政治面貌统计在校学生人数。"),
-        response_table=TablePayload(
-            columns=["college_name", "political_status", "total"],
-            rows=[
-                {"college_name": "食品学院", "political_status": "共青团员", "total": 420},
-                {"college_name": "食品学院", "political_status": "中共党员", "total": 120},
-                {"college_name": "工学院", "political_status": "共青团员", "total": 510},
-                {"college_name": "工学院", "political_status": "中共党员", "total": 160},
-            ],
-            total_rows=4,
-        ),
+def test_portal_query_visualization_prefers_horizontal_bar_for_ranking() -> None:
+    service = PortalQueryService(
+        query_service=StaticQueryService(
+            build_payload(
+                "按学院排名统计在校学生人数",
+                [
+                    {"college_name": "计算机学院", "total": 1200},
+                    {"college_name": "外国语学院", "total": 800},
+                    {"college_name": "法学院", "total": 760},
+                    {"college_name": "管理学院", "total": 730},
+                    {"college_name": "经贸学院", "total": 710},
+                    {"college_name": "艺术学院", "total": 680},
+                    {"college_name": "体育学院", "total": 420},
+                ],
+            )
+        )
     )
 
-    result = build_service(payload).query("按学院和政治面貌统计在校学生人数", database="wenshu_db")
+    payload = service.query("按学院排名统计在校学生人数", database="campus")
 
-    assert result.visualization is not None
-    assert result.visualization["chart"]["kind"] == "heatmap"
+    assert payload.visualization is not None
+    assert payload.visualization["chart"]["kind"] == "bar-horizontal"
+
+
+def test_portal_query_visualization_uses_heatmap_when_two_dimensions_exist() -> None:
+    service = PortalQueryService(
+        query_service=StaticQueryService(
+            build_payload(
+                "按学院和民族统计人数分布",
+                [
+                    {"college_name": "计算机学院", "nation_name": "汉族", "total": 120},
+                    {"college_name": "计算机学院", "nation_name": "回族", "total": 110},
+                    {"college_name": "外国语学院", "nation_name": "汉族", "total": 98},
+                    {"college_name": "外国语学院", "nation_name": "维吾尔族", "total": 87},
+                ],
+            )
+        )
+    )
+
+    payload = service.query("按学院和民族统计人数分布", database="campus")
+
+    assert payload.visualization is not None
+    assert payload.visualization["chart"]["kind"] == "heatmap"

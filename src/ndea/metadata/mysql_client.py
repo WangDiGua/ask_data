@@ -1,10 +1,8 @@
 from typing import Any
 
-import mysql.connector
 from pydantic import BaseModel
 
 from ndea.config import Settings
-from ndea.metadata.sqlalchemy_client import open_sqlalchemy_connection
 
 
 class MySQLConnectionInfo(BaseModel):
@@ -44,5 +42,13 @@ def build_mysql_connect_kwargs(settings: Settings, database: str | None = None) 
 
 def open_mysql_connection(settings: Settings, database: str | None = None):
     if settings.mysql_connection_backend.lower() == "sqlalchemy":
+        from ndea.metadata.sqlalchemy_client import open_sqlalchemy_connection
+
         return open_sqlalchemy_connection(settings, database=database)
+    try:
+        import mysql.connector
+    except ImportError as exc:
+        raise RuntimeError(
+            "mysql-connector-python is required when NDEA_MYSQL_CONNECTION_BACKEND is not 'sqlalchemy'"
+        ) from exc
     return mysql.connector.connect(**build_mysql_connect_kwargs(settings, database=database))

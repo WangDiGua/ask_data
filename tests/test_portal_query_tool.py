@@ -22,10 +22,10 @@ class FakePortalQueryService:
                     "executed": True,
                     "sql": "select 1",
                     "metadata": {
-                        "tool_trace": ["langgraph_planner"],
+                        "tool_trace": ["interaction", "intent_parse", "respond"],
                         "confidence": 1.0,
-                        "selected_sql_asset_id": None,
-                        "metric_id": "metric-1",
+                        "selected_sql_asset_id": "sql-1",
+                        "metric_id": "count",
                     },
                     "query_text": query_text,
                     "database": database,

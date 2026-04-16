@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 from ndea.context import RequestContext
 from ndea.config import Settings
-from ndea.security import MySQLGuardedQueryService
 
 
-def get_guarded_query_service() -> MySQLGuardedQueryService:
+def get_guarded_query_service():
+    from ndea.security.mysql_safe_execution import MySQLGuardedQueryService
+
     settings = Settings()
     return MySQLGuardedQueryService(settings)
 

@@ -1,10 +1,4 @@
-from ndea.security.safe_executor import (
-    ExplainCheckVerdict,
-    PermissionCheckVerdict,
-    SafeExecutionResult,
-    SafeExecutor,
-)
-from ndea.security.mysql_safe_execution import GuardedQueryPayload, MySQLGuardedQueryService
+from ndea.security.safe_executor import ExplainCheckVerdict, PermissionCheckVerdict, SafeExecutionResult, SafeExecutor
 from ndea.security.permission import (
     QueryPolicyContext,
     TablePermissionChecker,
@@ -21,8 +15,6 @@ from ndea.security.sql_guard import SQLGuard, SQLGuardVerdict
 
 __all__ = [
     "ExplainCheckVerdict",
-    "GuardedQueryPayload",
-    "MySQLGuardedQueryService",
     "PermissionCheckVerdict",
     "PolicyResolver",
     "QueryPolicyContext",
@@ -39,3 +31,10 @@ __all__ = [
     "parse_column_policy",
     "parse_row_filters",
 ]
+
+try:
+    from ndea.security.mysql_safe_execution import GuardedQueryPayload, MySQLGuardedQueryService
+
+    __all__.extend(["GuardedQueryPayload", "MySQLGuardedQueryService"])
+except Exception:
+    pass

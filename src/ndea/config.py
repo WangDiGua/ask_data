@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     env: str = "development"
     log_level: str = "INFO"
     workflow_runtime: str = "langgraph"
+    enable_legacy_tools: bool = False
+    embedding_provider: str = "http"
     milvus_uri: str = "http://8.137.15.201:6333"
     milvus_token: str = ""
     milvus_database: str = "default"
@@ -23,6 +25,14 @@ class Settings(BaseSettings):
     embedding_base_url: str = "http://192.168.2.43:11434"
     embedding_model: str = "bge-m3"
     embedding_vector_name: str = "embedding"
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = "https://cloud.langfuse.com"
+    learning_mysql_database: str = "ndea_learning"
+    nl2sql_engine: str = "llamaindex"
+    llamaindex_engine_factory: str = ""
+    milvus_collection_sql_cases: str = "sql_cases"
+    milvus_collection_query_memory: str = "query_memory"
     mysql_host: str = "127.0.0.1"
     mysql_port: int = 3306
     mysql_connection_backend: str = "sqlalchemy"

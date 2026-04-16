@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 import argparse
+import warnings
 
 from ndea.config import Settings
 from ndea.http import create_http_app
 from ndea.observability import get_health_service
+from ndea.runtime import configure_runtime, runtime_support_message
 from ndea.server import create_mcp, create_portal_mcp
+
+
+configure_runtime()
+runtime_message = runtime_support_message()
+if runtime_message:
+    warnings.warn(runtime_message, RuntimeWarning, stacklevel=1)
 
 
 mcp = create_mcp()

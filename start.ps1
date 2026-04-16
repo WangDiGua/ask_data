@@ -36,6 +36,19 @@ if ($env:PYTHONPATH) {
 
 $env:PYTHONPATH = ($pythonPathEntries | Select-Object -Unique) -join ';'
 
+try {
+    $runtimeMessage = & $pythonExe -c "from ndea.runtime import runtime_support_message; msg = runtime_support_message(); print(msg or '')"
+    if ($LASTEXITCODE -ne 0) {
+        throw "failed to inspect runtime"
+    }
+    $runtimeMessage = ($runtimeMessage | Out-String).Trim()
+    if (-not [string]::IsNullOrWhiteSpace($runtimeMessage)) {
+        Write-Warning $runtimeMessage
+    }
+} catch {
+    Write-Warning "Unable to inspect Python runtime compatibility: $($_.Exception.Message)"
+}
+
 & $pythonExe -c "import uvicorn, fastapi, ndea" *> $null
 if ($LASTEXITCODE -ne 0) {
     throw "Runtime dependencies are missing in .venv. Run: .\.venv\Scripts\python.exe -m pip install -e .[dev]"

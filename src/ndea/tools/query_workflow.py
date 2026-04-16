@@ -8,6 +8,9 @@ from ndea.tools.query_planner import get_query_planner_service
 from ndea.tools.sql_rag import get_sql_rag_service
 
 
+LEGACY_NOTE = "Legacy workflow tool. Use mcp_query_v2 or ask_data_query for production traffic."
+
+
 def get_query_workflow_service() -> QueryWorkflowService:
     settings = Settings()
     if settings.workflow_runtime.lower() == "langgraph":
@@ -43,5 +46,8 @@ def mcp_query_workflow(
         policy_context=policy_context,
     )
     if hasattr(payload, "model_dump"):
-        return payload.model_dump()
+        payload = payload.model_dump()
+    if isinstance(payload, dict):
+        payload.setdefault("legacy", True)
+        payload.setdefault("legacy_note", LEGACY_NOTE)
     return payload

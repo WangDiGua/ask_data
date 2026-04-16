@@ -4,6 +4,8 @@ from ndea.planning import QueryPlannerService
 from ndea.tools.sql_rag import get_sql_rag_service
 from ndea.tools.vector_locator import get_vector_locator_service
 
+LEGACY_NOTE = "Legacy planner tool. Use mcp_query_v2 for the new planning pipeline."
+
 
 def get_query_planner_service() -> QueryPlannerService:
     Settings()
@@ -33,5 +35,8 @@ def mcp_query_planner(
             raise
         payload = planner.plan(query_text=query_text, query_vector=query_vector)
     if hasattr(payload, "model_dump"):
-        return payload.model_dump()
+        payload = payload.model_dump()
+    if isinstance(payload, dict):
+        payload.setdefault("legacy", True)
+        payload.setdefault("legacy_note", LEGACY_NOTE)
     return payload

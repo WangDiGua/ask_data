@@ -5,8 +5,6 @@ from collections.abc import Callable
 from pydantic import BaseModel, Field
 
 from ndea.config import Settings
-from ndea.metadata.mysql_client import open_mysql_connection
-from ndea.vector.milvus_client import open_milvus_client
 
 
 class DependencyHealth(BaseModel):
@@ -65,6 +63,8 @@ def _check_mysql_dependency(settings: Settings) -> DependencyHealth:
     if not settings.enable_query_execution:
         return DependencyHealth(name="mysql", healthy=True, required=False, details="disabled")
     try:
+        from ndea.metadata.mysql_client import open_mysql_connection
+
         connection = open_mysql_connection(settings)
         connection.close()
         return DependencyHealth(name="mysql", healthy=True, required=True, details="ok")
@@ -76,6 +76,8 @@ def _check_milvus_dependency(settings: Settings) -> DependencyHealth:
     if not settings.enable_semantic_retrieval:
         return DependencyHealth(name="milvus", healthy=True, required=False, details="disabled")
     try:
+        from ndea.vector.milvus_client import open_milvus_client
+
         client = open_milvus_client(settings)
         exists = True
         if hasattr(client, "has_collection"):
